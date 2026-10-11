@@ -609,7 +609,7 @@ func (i *Interceptor) HandleAsk(ctx context.Context, convID int64, dec Decision,
 	})
 	activity := db.Activity{
 		Kind:    "intercept_request",
-		Summary: fmt.Sprintf("工具 %s 请求审批 (#%d)", toolName, pendingID),
+		Summary: fmt.Sprintf("Tool %s requested approval (#%d)", toolName, pendingID),
 		Detail:  string(detail),
 	}
 
