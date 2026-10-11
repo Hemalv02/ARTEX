@@ -456,13 +456,13 @@ func (i *Interceptor) Judge(ctx context.Context, tool string, arguments json.Raw
 		out, err = rv(cctx, cfg.ProfileID, cfg.Prompt, input)
 	}
 	if err != nil {
-		out = Decision{ProfileID: out.ProfileID, ModelFallback: true, Action: cfg.FailAction, Message: "模型审批失败,按失败策略处理: " + err.Error()}
+		out = Decision{ProfileID: out.ProfileID, ModelFallback: true, Action: cfg.FailAction, Message: "model review failed, applying the failure policy: " + err.Error()}
 	}
 	switch out.Action {
 	case "allow", "ask", "deny":
 		// valid verdict
 	default:
-		out = Decision{ProfileID: out.ProfileID, ModelFallback: true, Action: cfg.FailAction, Message: "模型输出无法解析,按失败策略处理"}
+		out = Decision{ProfileID: out.ProfileID, ModelFallback: true, Action: cfg.FailAction, Message: "model output could not be parsed, applying the failure policy"}
 	}
 	// A model verdict never carries a rule; keep RuleID 0 (→ NULL) for history.
 	out.RuleID = 0
@@ -477,9 +477,9 @@ func (i *Interceptor) Judge(ctx context.Context, tool string, arguments json.Raw
 	configJSON, _ := json.Marshal(cfg)
 	out.ConfigDigest = digestInput(configJSON)
 	if out.Message == "" {
-		out.Message = "[模型] " + judgeActionLabel(out.Action)
-	} else if !strings.HasPrefix(out.Message, "[模型]") {
-		out.Message = "[模型] " + out.Message
+		out.Message = "[model] " + judgeActionLabel(out.Action)
+	} else if !strings.HasPrefix(out.Message, "[model]") && !strings.HasPrefix(out.Message, "[模型]") {
+		out.Message = "[model] " + out.Message
 	}
 	if out.Action == "ask" {
 		out.TimeoutEnabled = true
@@ -492,11 +492,11 @@ func (i *Interceptor) Judge(ctx context.Context, tool string, arguments json.Raw
 func judgeActionLabel(action string) string {
 	switch action {
 	case "allow":
-		return "放行"
+		return "allow"
 	case "deny":
-		return "拦截"
+		return "block"
 	case "ask":
-		return "转人工审批"
+		return "escalate to human review"
 	default:
 		return action
 	}
