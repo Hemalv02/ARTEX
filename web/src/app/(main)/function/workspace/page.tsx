@@ -51,7 +51,7 @@ function fmtSize(n: number): string {
   return `${(n / 1024 / 1024 / 1024).toFixed(1)} GB`;
 }
 function fmtTime(ms: number): string {
-  return new Date(ms).toLocaleString("zh-CN", {
+  return new Date(ms).toLocaleString("en-US", {
     year: "2-digit",
     month: "2-digit",
     day: "2-digit",
