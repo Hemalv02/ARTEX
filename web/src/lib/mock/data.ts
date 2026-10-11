@@ -1305,7 +1305,7 @@ export const activity: Activity[] = [
     ts: T("2026-07-24T09:12:25Z"),
     kind: "thinking",
     summary:
-      "graph_overview: goals already decomposed by the goals layer - g1 "Obtain acme.com backend admin access" and g2 "Read user PII data", both open; facts=0, recent_facts empty (the graph is essentially blank, no worker output yet). In-scope assets are only the root domain acme.com + one /24 segment. Initial attack surface estimate: five entry points (www / admin / api / shop / vpn). No facts in the graph - I can only do very lightweight read-only probes to sharpen the initial intent descriptions. The plan itself must not perform any work.",
+      "graph_overview: goals already decomposed by the goals layer - g1 \"Obtain acme.com backend admin access\" and g2 \"Read user PII data\", both open; facts=0, recent_facts empty (the graph is essentially blank, no worker output yet). In-scope assets are only the root domain acme.com + one /24 segment. Initial attack surface estimate: five entry points (www / admin / api / shop / vpn). No facts in the graph - I can only do very lightweight read-only probes to sharpen the initial intent descriptions. The plan itself must not perform any work.",
   },
   {
     seq: 1002,
@@ -1366,7 +1366,7 @@ export const activity: Activity[] = [
     ts: T("2026-07-25T14:12:15Z"),
     kind: "thinking",
     summary:
-      "Reviewing recent_facts: workG returned faGit ".git downloadable, backend source reconstructed via git-dumper" and faCreds "config.php hardcodes sa/Acme@2021 (suspected internal reuse)"; work#6 fingerprint returned fa3 "shop matched Fastjson 1.2.24 (known deserialization RCE)". Two pieces of new material: (i) hardcoded DB password may be reused across the internal network; (ii) Fastjson has a mature RCE playbook. This opens a fundamentally different attack path from the existing auth/injection routes - RCE through shop straight into the DMZ. Pull faGit details first to verify the artifact.",
+      "Reviewing recent_facts: workG returned faGit \".git downloadable, backend source reconstructed via git-dumper\" and faCreds \"config.php hardcodes sa/Acme@2021 (suspected internal reuse)\"; work#6 fingerprint returned fa3 \"shop matched Fastjson 1.2.24 (known deserialization RCE)\". Two pieces of new material: (i) hardcoded DB password may be reused across the internal network; (ii) Fastjson has a mature RCE playbook. This opens a fundamentally different attack path from the existing auth/injection routes - RCE through shop straight into the DMZ. Pull faGit details first to verify the artifact.",
   },
   {
     seq: 1102,
@@ -1387,7 +1387,7 @@ export const activity: Activity[] = [
     tool_use_id: "p1-nd",
     summary:
       "faGit evidence: git-dumper reconstructed config.php / db.php / order_api.php; config.php contains $db=['host'=>'10.10.10.5','user'=>'sa','pass'=>'Acme@2021']",
-    detail: "The hardcoded target points to the internal 10.10.10.5 (FS01), corroborating faCreds's "internal reuse" inference - after RCE, this password is worth reusing.",
+    detail: "The hardcoded target points to the internal 10.10.10.5 (FS01), corroborating faCreds's \"internal reuse\" inference - after RCE, this password is worth reusing.",
   },
   {
     seq: 1104,
@@ -1398,7 +1398,7 @@ export const activity: Activity[] = [
     tool_use_id: "p1-ai",
     summary: "add_intent × 2 (Fastjson breach chain — serial steps, dispatch only the executable step first)",
     detail:
-      "intents=[\n  { summary: 'Deep-dive shop.acme.com component fingerprinting + Fastjson 1.2.24 CVE correlation (confirm gadget chain)', asset_ids: [shop], parent_ids: [fa3], priority: 7 },\n  { summary: 'Craft a Fastjson deserialization payload to trigger shop RCE and obtain a reverse shell', asset_ids: [shop], parent_ids: [fa3], priority: 9 },\n]\nNote: this is a strongly serial dependency chain - three steps recorded via TodoWrite ("fingerprint->RCE->foothold privesc"). This round only dispatches the first two; privesc depends on shell output and will be dispatched next round.",
+      "intents=[\n  { summary: 'Deep-dive shop.acme.com component fingerprinting + Fastjson 1.2.24 CVE correlation (confirm gadget chain)', asset_ids: [shop], parent_ids: [fa3], priority: 7 },\n  { summary: 'Craft a Fastjson deserialization payload to trigger shop RCE and obtain a reverse shell', asset_ids: [shop], parent_ids: [fa3], priority: 9 },\n]\nNote: this is a strongly serial dependency chain - three steps recorded via TodoWrite (\"fingerprint->RCE->foothold privesc\"). This round only dispatches the first two; privesc depends on shell output and will be dispatched next round.",
   },
   {
     seq: 1105,
@@ -1415,7 +1415,7 @@ export const activity: Activity[] = [
     ts: T("2026-07-25T14:13:00Z"),
     kind: "text",
     summary:
-      "Situation upgrade: source code + hardcoded internal-network password + Fastjson RCE form an entirely new attack path. Requested the goals layer to register g3 "Breach the DMZ from the external network and establish an internal foothold", dispatching i6 (fingerprinting/CVE correlation) and i7 (triggering RCE). The DMZ privesc step depends on shell output - logged as a follow-up to dispatch next round.",
+      "Situation upgrade: source code + hardcoded internal-network password + Fastjson RCE form an entirely new attack path. Requested the goals layer to register g3 \"Breach the DMZ from the external network and establish an internal foothold\", dispatching i6 (fingerprinting/CVE correlation) and i7 (triggering RCE). The DMZ privesc step depends on shell output - logged as a follow-up to dispatch next round.",
   },
 
   // -- Round 2 · Foothold established, pivot to internal（2026-07-25 20:25）--
@@ -1432,7 +1432,7 @@ export const activity: Activity[] = [
     ts: T("2026-07-25T20:25:18Z"),
     kind: "thinking",
     summary:
-      "Reviewing lineage: i7 returned fa4 "Reverse shell as www-data@dmz-web01 (10.0.20.15), in the DMZ segment"; the privesc chain returned fa5 "sudo -l hit NOPASSWD python3 -> can escalate to root" and fa6 "Foothold second NIC directly connects to internal 10.10.10.0/24". The g3 acceptance criteria (DMZ breach + foothold) are directly satisfied by fa4+fa6. Verify fa6 internal reachability before prove_goal.",
+      "Reviewing lineage: i7 returned fa4 \"Reverse shell as www-data@dmz-web01 (10.0.20.15), in the DMZ segment\"; the privesc chain returned fa5 \"sudo -l hit NOPASSWD python3 -> can escalate to root\" and fa6 \"Foothold second NIC directly connects to internal 10.10.10.0/24\". The g3 acceptance criteria (DMZ breach + foothold) are directly satisfied by fa4+fa6. Verify fa6 internal reachability before prove_goal.",
   },
   {
     seq: 1202,
@@ -1461,7 +1461,7 @@ export const activity: Activity[] = [
     tool_use_id: "p2-pg",
     summary: "prove_goal(g3, evidence=fa6)",
     detail:
-      "reason: i7 RCE took the DMZ foothold (fa4), fa5 escalated to root, fa6 proved the second NIC directly reaches the internal network and pings DC01 - "Breach the DMZ and establish an internal foothold" acceptance met.",
+      "reason: i7 RCE took the DMZ foothold (fa4), fa5 escalated to root, fa6 proved the second NIC directly reaches the internal network and pings DC01 - \"Breach the DMZ and establish an internal foothold\" acceptance met.",
   },
   {
     seq: 1205,
@@ -1498,7 +1498,7 @@ export const activity: Activity[] = [
     ts: T("2026-07-25T20:26:20Z"),
     kind: "text",
     summary:
-      "g3 achieved — the attack surface has shifted from the external network to the internal network. Requested registration of g4 "Lateral movement — take over the internal target DC01"; dispatching i9 (host discovery) + i10/i11/i12 in parallel for lateral movement. Credential reuse is anchored directly to faCreds — passwords leaked from the external source feed the internal lateral movement.",
+      "g3 achieved — the attack surface has shifted from the external network to the internal network. Requested registration of g4 \"Lateral movement — take over the internal target DC01\"; dispatching i9 (host discovery) + i10/i11/i12 in parallel for lateral movement. Credential reuse is anchored directly to faCreds — passwords leaked from the external source feed the internal lateral movement.",
   },
 
   // -- Round 3 · Target achieved — review（2026-07-26 00:25）--
@@ -1509,7 +1509,7 @@ export const activity: Activity[] = [
     ts: T("2026-07-26T00:25:16Z"),
     kind: "thinking",
     summary:
-      "Reviewing this round's worker output: i9->fa7 "Internal live hosts DC01/FS01/JENKINS"; i11->fa8 "Jenkins /script unauthenticated Groovy" + fa9 "Plaintext password for acme\\svc_deploy exported from Jenkins credential store"; i12->fa10 "Kerberoast svc_sql TGS, hashcat cracked Sql@2020". svc_deploy is a Domain Admin, and i13 has used it via psexec to take DC01 and run secretsdump. The g4 acceptance (DC01 takeover) should be met - verify the finding evidence chain before signing off.",
+      "Reviewing this round's worker output: i9->fa7 \"Internal live hosts DC01/FS01/JENKINS\"; i11->fa8 \"Jenkins /script unauthenticated Groovy\" + fa9 \"Plaintext password for acme\\svc_deploy exported from Jenkins credential store\"; i12->fa10 \"Kerberoast svc_sql TGS, hashcat cracked Sql@2020\". svc_deploy is a Domain Admin, and i13 has used it via psexec to take DC01 and run secretsdump. The g4 acceptance (DC01 takeover) should be met - verify the finding evidence chain before signing off.",
   },
   {
     seq: 1302,
@@ -1528,7 +1528,7 @@ export const activity: Activity[] = [
     tool: "list_findings",
     tool_use_id: "p3-lf",
     summary:
-      "F-09 "Full control of DC01 / secretsdump exports the entire domain hash space" critical (evidence: psexec svc_deploy@10.10.10.10 + NTDS.dit dump); upstream chain fa9→fa10→i13 is complete",
+      "F-09 \"Full control of DC01 / secretsdump exports the entire domain hash space\" critical (evidence: psexec svc_deploy@10.10.10.10 + NTDS.dit dump); upstream chain fa9→fa10→i13 is complete",
   },
   {
     seq: 1304,
@@ -1539,7 +1539,7 @@ export const activity: Activity[] = [
     tool_use_id: "p3-pg",
     summary: "prove_goal(g4, evidence=F-09)",
     detail:
-      "reason: Jenkins disclosed svc_deploy (Domain Admin) -> psexec controls DC01 -> secretsdump for all domain hashes, F-09 confirmed, objective "Take over the internal target DC01" achieved.",
+      "reason: Jenkins disclosed svc_deploy (Domain Admin) -> psexec controls DC01 -> secretsdump for all domain hashes, F-09 confirmed, objective \"Take over the internal target DC01\" achieved.",
   },
   {
     seq: 1305,
@@ -1556,7 +1556,7 @@ export const activity: Activity[] = [
     ts: T("2026-07-26T00:26:10Z"),
     kind: "text",
     summary:
-      "g4 wrapped up - the external-to-internal chain is fully connected (external RCE -> DMZ -> internal -> DC). Reviewing uncovered directions one by one: g2 "Read user PII data" is still one step short, but existing i3 (backend user endpoints) + i5 (API IDOR) already cover this direction and both are running. No fundamentally new uncovered directions this round - per the restraint principle, 0 new intents; wait for i3/i5 output.",
+      "g4 wrapped up - the external-to-internal chain is fully connected (external RCE -> DMZ -> internal -> DC). Reviewing uncovered directions one by one: g2 \"Read user PII data\" is still one step short, but existing i3 (backend user endpoints) + i5 (API IDOR) already cover this direction and both are running. No fundamentally new uncovered directions this round - per the restraint principle, 0 new intents; wait for i3/i5 output.",
   },
 
   // -- Round 4 · Backend achieved, converge g2（2026-07-26 03:55）--
@@ -1573,7 +1573,7 @@ export const activity: Activity[] = [
     ts: T("2026-07-26T03:55:14Z"),
     kind: "thinking",
     summary:
-      "Reviewing recent_facts: work#2 used the Acme@2021 from faCreds to hit the admin backend (i2 done) - admin access acquired, g1 acceptance met, sign off via prove_goal. Then perform a quantitative acceptance check: g2 "Read user PII data" - currently only i3/i5 have touched the API surface, no bulk data has been extracted. Measured result is short of the bar. prove_goal is FORBIDDEN; instead raise priority and reinforce the data-extraction intents.",
+      "Reviewing recent_facts: work#2 used the Acme@2021 from faCreds to hit the admin backend (i2 done) - admin access acquired, g1 acceptance met, sign off via prove_goal. Then perform a quantitative acceptance check: g2 \"Read user PII data\" - currently only i3/i5 have touched the API surface, no bulk data has been extracted. Measured result is short of the bar. prove_goal is FORBIDDEN; instead raise priority and reinforce the data-extraction intents.",
   },
   {
     seq: 1402,
@@ -1601,7 +1601,7 @@ export const activity: Activity[] = [
     ts: T("2026-07-26T03:55:40Z"),
     kind: "thinking",
     summary:
-      "g2 quantitative check: objective says "Read user PII data" - that equals actually obtaining bulk user records. graph_overview has no "Successfully exported user data" finding yet, and i3/i5 are both running without returning extraction results - measured result is short of the bar. Strictly forbidden to mark met with the excuse "backend is in, roughly there"; keep dispatching intents to close the gap.",
+      "g2 quantitative check: objective says \"Read user PII data\" - that equals actually obtaining bulk user records. graph_overview has no \"Successfully exported user data\" finding yet, and i3/i5 are both running without returning extraction results - measured result is short of the bar. Strictly forbidden to mark met with the excuse \"backend is in, roughly there\"; keep dispatching intents to close the gap.",
   },
   {
     seq: 1405,
@@ -1621,7 +1621,7 @@ export const activity: Activity[] = [
     kind: "tool_result",
     tool: "add_intent",
     tool_use_id: "p4-ai",
-    summary: "2 intents updated → ids=[i3, i5] (priority raised to 9, description refined to "bulk data extraction")",
+    summary: "2 intents updated → ids=[i3, i5] (priority raised to 9, description refined to \"bulk data extraction\")",
   },
   {
     seq: 1407,
@@ -2709,7 +2709,7 @@ export const activity: Activity[] = [
     ts: T("2026-07-26T03:52:08Z"),
     kind: "text",
     summary:
-      "Objective 2 is reading user PII data: push "backend user endpoint enumeration" and "API IDOR" in parallel. Note that bulk export will trigger intercept rules and needs your approval to release.",
+      "Objective 2 is reading user PII data: push \"backend user endpoint enumeration\" and \"API IDOR\" in parallel. Note that bulk export will trigger intercept rules and needs your approval to release.",
   },
   {
     seq: 400,
@@ -3636,7 +3636,7 @@ export const conversationMessages: Record<number, Activity[]> = {
       ts: T("2026-07-25T10:00:30Z"),
       kind: "text",
       summary:
-        "Conclusion: Element-UI backend, no CAPTCHA, no rate limiting. Recommended order: (1) try the default-password table first (admin/admin, admin/admin123, admin/123456); (2) if those fail, escalate to a top-1000 dictionary. I have injected a high-priority "backend default password test" intent to the work agent.",
+        "Conclusion: Element-UI backend, no CAPTCHA, no rate limiting. Recommended order: (1) try the default-password table first (admin/admin, admin/admin123, admin/123456); (2) if those fail, escalate to a top-1000 dictionary. I have injected a high-priority \"backend default password test\" intent to the work agent.",
     },
     { seq: 8, worker: "user", ts: T("2026-07-26T03:40:00Z"), kind: "user", summary: "Did it work?" },
     {
@@ -3645,7 +3645,7 @@ export const conversationMessages: Record<number, Activity[]> = {
       ts: T("2026-07-26T03:40:05Z"),
       kind: "text",
       summary:
-        "Done - admin/admin123 logged straight into the console, recorded as a high-severity finding and used to prove "Obtain acme.com backend admin access". Next, pivot to reading user data (objective 2).",
+        "Done - admin/admin123 logged straight into the console, recorded as a high-severity finding and used to prove \"Obtain acme.com backend admin access\". Next, pivot to reading user data (objective 2).",
     },
   ],
   2: [
@@ -4162,7 +4162,7 @@ export function llmRecordDetail(id: number, records = llmRecords) {
     request_body: JSON.stringify(
       {
         model: item.model,
-        system: "You are the "executor" of an authorized penetration testing system... (truncated)",
+        system: "You are the \"executor\" of an authorized penetration testing system... (truncated)",
         messages: [{ role: "user", content: "Begin executing the intent from the system prompt: do only that, produce only facts, and stop when done." }],
         tools: ["bash", "insert_assets", "record_fact", "report_finding"],
       },
@@ -4187,7 +4187,7 @@ export function llmRecordDetail(id: number, records = llmRecords) {
       max_tokens: 8192,
       stream: true,
       system: [
-        { type: "text", text: "You are the "executor" of an authorized penetration testing system... (truncated)", cache_control: { type: "ephemeral" } },
+        { type: "text", text: "You are the \"executor\" of an authorized penetration testing system... (truncated)", cache_control: { type: "ephemeral" } },
       ],
       messages: [{ role: "user", content: "Begin executing the intent from the system prompt: do only that, produce only facts, and stop when done." }],
       tools: [

@@ -679,7 +679,7 @@ function CustomToolDialog({
       >
         <SheetHeader className="px-4">
           <SheetTitle>{isNew ? "New custom tool" : `Edit ${tool?.key}`}</SheetTitle>
-          <SheetDescription>shell = bash environment declaration (only name + description, telling the model it's available via bash); command/script/http require execution definitions.</Sheet>
+          <SheetDescription>shell = bash environment declaration (only name + description, telling the model it is available via bash); command/script/http require execution definitions.</SheetDescription>
         </SheetHeader>
 
         <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 pb-4">

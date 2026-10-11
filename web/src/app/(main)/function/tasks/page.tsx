@@ -2563,7 +2563,7 @@ function CategoryPicker({
               className="flex w-full items-center gap-2 px-2 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground disabled:opacity-50"
             >
               {creating ? <Spinner className="size-4" /> : <PlusIcon className="size-4" />}
-              Create category "{trimmed}"
+              Create category &quot;{trimmed}&quot;
             </button>
           ) : (
             <div className="px-2 py-2 text-sm text-muted-foreground">Type a name to search or create a category</div>
@@ -2650,7 +2650,7 @@ function CompanyPicker({
                 </div>
               </ComboboxItem>
             );
-          })}
+          }}
         </ComboboxList>
       </ComboboxContent>
     </Combobox>

@@ -17,7 +17,7 @@ type reviewCaptureProvider struct{ request llm.CompletionRequest }
 func (p *reviewCaptureProvider) Stream(_ context.Context, request llm.CompletionRequest) iter.Seq2[llm.StreamEvent, error] {
 	p.request = request
 	return func(yield func(llm.StreamEvent, error) bool) {
-		yield(llm.StreamEvent{Type: llm.SETextDelta, Text: `{"decision":"ask","comment":"actual operation: delete file; consequences after success: file will be lost, ownership not yet confirmed; matching rule: ASK (unknown ownership)"}`}, nil)
+		yield(llm.StreamEvent{Type: llm.SETextDelta, Text: `{"decision":"ask","comment":"Actual operation: delete file; Post-success impact: file will be lost, ownership not yet confirmed; Matched rule: ASK (unknown ownership)"}`}, nil)
 	}
 }
 func (p *reviewCaptureProvider) Complete(ctx context.Context, req llm.CompletionRequest) (llm.Message, string, llm.Usage, error) {

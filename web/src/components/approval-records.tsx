@@ -433,7 +433,7 @@ export function ApprovalDetail({
                 <Alert>
                   <AlertDescription>
                     {audit.model_input_digest
-                      ? "This historical record only kept a fingerprint of the review input, not the input itself, so the context that was sent to the model cannot be reconstructed. This does not mean no context existed at review time; new model verdicts retain input snapshots."}
+                      ? "This historical record only kept a fingerprint of the review input, not the input itself, so the context that was sent to the model cannot be reconstructed. This does not mean no context existed at review time; new model verdicts retain input snapshots."
                       : "This record did not persist the model review input. It may have been decided by a rule, an error may have occurred before the model was called, or it was produced by an older version."}
                   </AlertDescription>
                 </Alert>

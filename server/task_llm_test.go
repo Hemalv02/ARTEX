@@ -117,7 +117,7 @@ func TestIsQuotaExhaustedError(t *testing.T) {
 		`billing_hard_limit_reached`,
 		`billing_not_active`,
 		`HTTP status 402 Payment Required`,
-		`account balance insufficient, please top up`,
+		`insufficient balance, please top up`,
 		`credit balance is too low`,
 	}
 	for _, message := range positive {

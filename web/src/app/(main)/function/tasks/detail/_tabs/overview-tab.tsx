@@ -474,7 +474,7 @@ export function OverviewTab({ taskId }: { taskId: string }) {
           <div className="flex flex-wrap items-center gap-2">
             <Input
               className="h-7 min-w-56 flex-1 text-sm"
-              placeholder="New goal, e.g. \"Obtain administrative access via vertical privilege escalation\""
+              placeholder="New goal, e.g. &quot;Obtain administrative access via vertical privilege escalation&quot;"
               value={goalText}
               onChange={(e) => setGoalText(e.target.value)}
               onKeyDown={(e) => {
@@ -607,7 +607,7 @@ export function OverviewTab({ taskId }: { taskId: string }) {
             </NativeSelect>
             <Input
               className="h-7 min-w-56 flex-1 text-sm"
-              placeholder="An operation constraint, e.g. \"Only test the current port, do not scan others\""
+              placeholder="An operation constraint, e.g. &quot;Only test the current port, do not scan others&quot;"
               value={conText}
               onChange={(e) => setConText(e.target.value)}
               onKeyDown={(e) => {
