@@ -5,8 +5,8 @@ import { activeMention, mentionSearch, mentionToken, selectedMentions } from "./
 test("mention trigger supports non-ASCII queries and cursor placement without hijacking email", () => {
   assert.equal(activeMention("user@example.com", 16), null);
   assert.equal(activeMention("done @[Finding#1 X]", 8), null);
-  assert.deepEqual(activeMention("看 @漏洞 后面", 5), { start: 2, end: 5, query: "漏洞" });
-  assert.equal(activeMention("@漏洞\n下一行", 8), null);
+  assert.deepEqual(activeMention("x @çé y", 5), { start: 2, end: 5, query: "çé" });
+  assert.equal(activeMention("@çé\nmore", 8), null);
 });
 
 test("categories, label/alias, IP and keyword search", () => {

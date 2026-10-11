@@ -166,6 +166,7 @@ export function classifyCompanyScopeLine(
     const error = companyScopeRuleError(rule);
     return error ? { line, error } : { line, rule };
   }
+  // "备案" is the Chinese term for an ICP filing; kept so Chinese-worded ICP inputs are still detected.
   if (/icp|备案/i.test(value)) return { line, rule: { kind: "icp", value } };
   return { line, rule: { kind: "keyword", value } };
 }
