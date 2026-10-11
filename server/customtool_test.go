@@ -175,7 +175,7 @@ func TestHTTPToolTruncatesLargeBody(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	execRaw, _ := json.Marshal(map[string]any{"method": "GET", "url": srv.URL})
+	execRaw, _ := json.Marshal(map[string]any{"method": http.MethodGet, "url": srv.URL})
 	res, err := (&Server{}).runHTTPTool(context.Background(), execRaw, map[string]any{}, nil)
 	if err != nil {
 		t.Fatalf("runHTTPTool: %v", err)

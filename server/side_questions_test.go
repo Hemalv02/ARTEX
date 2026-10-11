@@ -251,7 +251,7 @@ func TestSideHTTPBusyIsolationClearAndReconnect(t *testing.T) {
 	httpServer := httptest.NewServer(f.handler)
 	defer httpServer.Close()
 	for i := 0; i < 2; i++ {
-		req, _ := http.NewRequest("GET", httpServer.URL+"/api/side-questions/"+e.ID+"/events", nil)
+		req, _ := http.NewRequest(http.MethodGet, httpServer.URL+"/api/side-questions/"+e.ID+"/events", nil)
 		req.Header.Set("Authorization", "Bearer "+f.token)
 		req.Header.Set("Last-Event-ID", "999")
 		resp, err := http.DefaultClient.Do(req)
@@ -299,7 +299,7 @@ func TestSideHTTPBusyIsolationClearAndReconnect(t *testing.T) {
 	f.s.cfgMu.Lock()
 	f.s.llmCfg.Model = "changed"
 	f.s.cfgMu.Unlock()
-	f.call(t, "GET", path, nil, 200)
+	f.call(t, http.MethodGet, path, nil, 200)
 	f.call(t, "POST", path, map[string]string{"question": "changed config", "client_request_id": "new"}, 409)
 }
 
@@ -343,7 +343,7 @@ func TestSideHTTPGlobalLimitTaskWorkerAndDeletion(t *testing.T) {
 		e := decodeSide(t, f.call(t, "POST", path, map[string]string{"question": "which context", "client_request_id": "own"}, 202))
 		waitSide(t, f.m.pg, e.ID, "completed")
 	}
-	f.call(t, "GET", fmt.Sprintf("/api/tasks/%s/intents/%d/side-questions", task.ID, iid+1000000), nil, 404)
+	f.call(t, http.MethodGet, fmt.Sprintf("/api/tasks/%s/intents/%d/side-questions", task.ID, iid+1000000), nil, 404)
 	if _, err := f.s.applyIntentControl(t.Context(), task, iid, "cancel", "cleanup", ""); err != nil {
 		t.Fatal(err)
 	}
@@ -407,7 +407,7 @@ func TestSideCheckpointPersistsBeforeAdmissionAndRestart(t *testing.T) {
 	}
 	// All routes pass the same authentication middleware.
 	w := httptest.NewRecorder()
-	f.handler.ServeHTTP(w, httptest.NewRequest("GET", path, nil))
+	f.handler.ServeHTTP(w, httptest.NewRequest(http.MethodGet, path, nil))
 	if w.Code != 401 {
 		t.Fatalf("unauthenticated side route: %d", w.Code)
 	}

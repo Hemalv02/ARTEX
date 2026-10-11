@@ -93,7 +93,7 @@ func normalizeHeaders(headers map[string]string) (map[string]string, error) {
 }
 
 // New connects to a remote MCP endpoint and performs the initialize handshake.
-// headers are sent on every request (Authorization, custom API keys, …).
+// headers are sent on every request (Authorization, custom API keys, ...).
 // When insecure is true, TLS certificate verification is skipped so servers that
 // present a self-signed certificate can still be reached (issue #108).
 func New(ctx context.Context, server, url string, headers map[string]string, insecure bool) (*Client, error) {
@@ -315,9 +315,11 @@ func (c *Client) wrap(rt remoteTool) actool.CoreTool {
 			for _, blk := range res.Content {
 				text += blk.Text
 			}
-			// 与内置/自定义工具一致：超长输出走 Capture——按会话 MaxOutputChars（默认
-			// 30000）截断，配了 ToolOutputDir 时全量溢写到磁盘只留 head + 指针，避免大
-			// MCP 结果整段灌爆上下文。
+			// Match built-in / custom tools: oversized output is captured by
+			// Capture, which truncates per the session's MaxOutputChars (default
+			// 30000) and, when ToolOutputDir is configured, spills the full
+			// content to disk keeping only the head plus a pointer — so a large
+			// MCP response doesn't blow up the context.
 			return actool.Result{Content: []llm.ContentBlock{llm.TextBlock(actool.Capture(tc, text))}, IsError: res.IsError}, nil
 		},
 	})

@@ -62,7 +62,7 @@ func TestCoreTaskLifecyclePG(t *testing.T) {
 	}
 
 	// create a task → 201, returns PG task (string id + exploration_id)
-	code, out := doRetry("POST", "/api/tasks", map[string]string{"description": "smoke", "goal": "测试 SQLi/XSS"})
+	code, out := doRetry("POST", "/api/tasks", map[string]string{"description": "smoke test", "goal": "test SQLi/XSS"})
 	if code != 201 {
 		t.Fatalf("create task: %d (%v)", code, out)
 	}
@@ -89,14 +89,14 @@ func TestCoreTaskLifecyclePG(t *testing.T) {
 	}
 
 	// it shows in the task list
-	code, out = doRetry("GET", "/api/tasks", nil)
+	code, out = doRetry(http.MethodGet, "/api/tasks", nil)
 	if code != 200 {
 		t.Fatalf("list tasks: %d", code)
 	}
 
 	// The task detail header consumes the top-level engine mode while some clients
 	// read the active-task snapshot. Keep both representations in sync.
-	code, out = doRetry("GET", "/api/stats?task="+id, nil)
+	code, out = doRetry(http.MethodGet, "/api/stats?task="+id, nil)
 	if code != 200 {
 		t.Fatalf("task stats: %d (%v)", code, out)
 	}

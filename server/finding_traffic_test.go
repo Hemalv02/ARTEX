@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
@@ -168,16 +169,16 @@ func TestFindingTrafficAPIAndExport(t *testing.T) {
 	if w = req("PUT", base+"/order", fmt.Sprintf(`{"version":2,"binding_ids":["%d"]}`, first)); w.Code != 409 {
 		t.Fatal(w.Code, w.Body)
 	}
-	if w = req("GET", fmt.Sprintf("%s/%d", base, first), ""); w.Code != 200 || !strings.Contains(w.Body.String(), `"binary":true`) {
+	if w = req(http.MethodGet, fmt.Sprintf("%s/%d", base, first), ""); w.Code != 200 || !strings.Contains(w.Body.String(), `"binary":true`) {
 		t.Fatal(w.Code, w.Body)
 	}
-	if w = req("GET", fmt.Sprintf("%s/%d/body?side=response&offset=20001", base, first), ""); w.Code != 422 {
+	if w = req(http.MethodGet, fmt.Sprintf("%s/%d/body?side=response&offset=20001", base, first), ""); w.Code != 422 {
 		t.Fatal(w.Code, w.Body)
 	}
 	if _, err := s.m.traffic.DeleteHost("evidence.local"); err != nil {
 		t.Fatal(err)
 	}
-	if w = req("GET", fmt.Sprintf("%s/%d/body?side=response&download=1", base, first), ""); w.Code != 200 || !bytes.Equal(w.Body.Bytes(), body) {
+	if w = req(http.MethodGet, fmt.Sprintf("%s/%d/body?side=response&download=1", base, first), ""); w.Code != 200 || !bytes.Equal(w.Body.Bytes(), body) {
 		t.Fatal("download after original removal failed")
 	}
 	// IDs belong to the requested finding; cross-finding detail cannot be read.
@@ -193,11 +194,11 @@ func TestFindingTrafficAPIAndExport(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if w = req("GET", fmt.Sprintf("/api/exploration/findings/%d/traffic/%d", other.FindingID, first), ""); w.Code != 404 {
+	if w = req(http.MethodGet, fmt.Sprintf("/api/exploration/findings/%d/traffic/%d", other.FindingID, first), ""); w.Code != 404 {
 		t.Fatal(w.Code, w.Body)
 	}
 	exportURL := fmt.Sprintf("/api/exploration/findings/export?format=md-zip&scope=selected&ids=%d", f.FindingID)
-	w = req("GET", exportURL, "")
+	w = req(http.MethodGet, exportURL, "")
 	if w.Code != 200 {
 		t.Fatal(w.Code, w.Body)
 	}
@@ -241,7 +242,7 @@ func TestFindingTrafficAPIAndExport(t *testing.T) {
 	if err = os.WriteFile(path, []byte("corrupt"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	if w = req("GET", exportURL, ""); w.Code < 400 || strings.Contains(w.Header().Get("Content-Type"), "zip") {
+	if w = req(http.MethodGet, exportURL, ""); w.Code < 400 || strings.Contains(w.Header().Get("Content-Type"), "zip") {
 		t.Fatal("corrupt export returned an attachment", w.Code)
 	}
 }
@@ -352,7 +353,7 @@ func TestFindingTrafficArchiveV3RoundTripAndRetry(t *testing.T) {
 	}
 	// The read tool enforces task visibility too.
 	result, err := s.toolGetFindingTraffic().Call(agent.WithRunInfo(ctx, agent.RunInfo{TaskID: sid}), json.RawMessage(fmt.Sprintf(`{"finding_id":"%d"}`, f.FindingID)), nil)
-	if err != nil || !strings.Contains(result.Flatten(), "不可读取") {
+	if err != nil || !strings.Contains(result.Flatten(), "not readable") {
 		t.Fatal(result, err)
 	}
 }
@@ -389,7 +390,7 @@ func TestFindingTrafficFailedReportDoesNotTrigger(t *testing.T) {
 func TestFindingTrafficUTF8SegmentsAndInheritedWrites(t *testing.T) {
 	s, f, req := trafficEvidenceServer(t)
 	ctx := context.Background()
-	text := strings.Repeat("中文证据🙂", 2000)
+	text := strings.Repeat("CJK evidence 🙂 ", 2000)
 	seedServerEvidenceFlow(t, s, "unicode", []byte(text))
 	list, err := s.evidenceStore().Bind(ctx, f.FindingID, []db.TrafficRef{{TrafficID: "unicode"}})
 	if err != nil {
@@ -434,7 +435,7 @@ func TestFindingTrafficUTF8SegmentsAndInheritedWrites(t *testing.T) {
 	defer s.m.pg.DeleteTask(cid)
 	base := fmt.Sprintf("/api/exploration/findings/%d/traffic", f.FindingID)
 	suffix := "?context_task=" + child.ID
-	if w := req("GET", base+suffix, ""); w.Code != 200 {
+	if w := req(http.MethodGet, base+suffix, ""); w.Code != 200 {
 		t.Fatal(w.Code, w.Body)
 	}
 	for _, method := range []string{"POST", "PATCH", "PUT", "DELETE"} {
@@ -453,7 +454,7 @@ func TestFindingTrafficUTF8SegmentsAndInheritedWrites(t *testing.T) {
 	if _, err = s.m.traffic.DeleteHost("evidence.local"); err != nil {
 		t.Fatal(err)
 	}
-	result, err := s.toolUpdateFindingReport().Call(ctx, json.RawMessage(fmt.Sprintf(`{"finding_id":%d,"evidence_version":1,"report":"## 证据报告\n\n证据 #%d：已验证完整请求响应"}`, f.NodeID, list.Bindings[0].ID)), nil)
+	result, err := s.toolUpdateFindingReport().Call(ctx, json.RawMessage(fmt.Sprintf(`{"finding_id":%d,"evidence_version":1,"report":"## Evidence report\n\nevidence #%d: verified the complete request and response"}`, f.NodeID, list.Bindings[0].ID)), nil)
 	if err != nil || result.IsError {
 		t.Fatal(result, err)
 	}
@@ -465,7 +466,7 @@ func TestFindingTrafficUTF8SegmentsAndInheritedWrites(t *testing.T) {
 		t.Fatal("report did not record the read evidence version")
 	}
 	for _, format := range []string{"md-single", "json", "csv"} {
-		w := req("GET", fmt.Sprintf("/api/exploration/findings/export?scope=selected&ids=%d&format=%s", f.FindingID, format), "")
+		w := req(http.MethodGet, fmt.Sprintf("/api/exploration/findings/export?scope=selected&ids=%d&format=%s", f.FindingID, format), "")
 		if w.Code != 200 {
 			t.Fatal(format, w.Code, w.Body)
 		}

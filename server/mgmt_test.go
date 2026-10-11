@@ -43,7 +43,7 @@ func TestMgmtAPI(t *testing.T) {
 	}
 
 	// agents list — must include at least the seeded builtins
-	code, out := do("GET", "/api/agents", nil)
+	code, out := do(http.MethodGet, "/api/agents", nil)
 	if code != 200 {
 		t.Fatalf("GET agents: %d", code)
 	}
@@ -58,7 +58,7 @@ func TestMgmtAPI(t *testing.T) {
 	}
 
 	// valid template using seeded catalog vars → 200
-	code, _ = do("PUT", "/api/agents/planner/prompt", map[string]string{"template": "你是规划者，目标：{{.Goal}}，摘要 {{.AssetSummary}}"})
+	code, _ = do("PUT", "/api/agents/planner/prompt", map[string]string{"template": "you are planner, goal: {{.Goal}}, summary {{.AssetSummary}}"})
 	if code != 200 {
 		t.Fatalf("valid prompt save: %d", code)
 	}
@@ -68,7 +68,7 @@ func TestMgmtAPI(t *testing.T) {
 	if code != 200 {
 		t.Fatalf("preview: %d", code)
 	}
-	if rendered, _ := out["rendered"].(string); rendered == "" || rendered == "你是规划者，目标：{{.Goal}}，摘要 {{.AssetSummary}}" {
+	if rendered, _ := out["rendered"].(string); rendered == "" || rendered == "you are planner, goal: {{.Goal}}, summary {{.AssetSummary}}" {
 		t.Fatalf("preview did not substitute: %q", out["rendered"])
 	}
 
@@ -86,7 +86,7 @@ func TestMgmtAPI(t *testing.T) {
 	if code != 200 {
 		t.Fatalf("set visibility: %d", code)
 	}
-	code, out = do("GET", "/api/visibility/mcp/"+itoaTest(mid), nil)
+	code, out = do(http.MethodGet, "/api/visibility/mcp/"+itoaTest(mid), nil)
 	if code != 200 {
 		t.Fatalf("resource visibility: %d", code)
 	}

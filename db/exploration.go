@@ -12,34 +12,45 @@ import (
 	"time"
 )
 
-// ErrIntentStateConflict marks a failed compare-and-set transition. Callers use
-// it to distinguish an expected control race (HTTP 409) from a storage failure.
+// ErrIntentStateConflict marks a failed compare-and-set transition.
+// Callers use it to distinguish an expected control race (HTTP 409)
+// from a storage failure.
 var ErrIntentStateConflict = errors.New("intent state changed concurrently")
 
-// utf8Clean makes a string safe for a PostgreSQL text column. It (1) replaces
-// invalid UTF-8 byte sequences with U+FFFD and (2) strips NUL (0x00) bytes.
-// Tool output (nmap/curl/… stdout) can carry raw/truncated bytes that PostgreSQL's
-// UTF8 encoding rejects ("invalid byte sequence for encoding UTF8"); without this
-// the INSERT fails and the activity record is silently lost. NUL is *valid* UTF-8
-// (U+0000) so ToValidUTF8 leaves it in place, yet PostgreSQL text still rejects it
-// (SQLSTATE 22021) — so it must be removed separately. JSONB columns need the
-// separate jsonbClean below: json.Marshal encodes a NUL as the escape backslash-u-0000,
-// which the text-type json accepts but jsonb rejects (SQLSTATE 22P05).
+// utf8Clean makes a string safe for a PostgreSQL text column. It
+// (1) replaces invalid UTF-8 byte sequences with U+FFFD and (2)
+// strips NUL (0x00) bytes.
+//
+// Tool output (nmap/curl/… stdout) can carry raw/truncated bytes
+// that PostgreSQL's UTF8 encoding rejects ("invalid byte sequence
+// for encoding UTF8"); without this the INSERT fails and the
+// activity record is silently lost.
+//
+// NUL is *valid* UTF-8 (U+0000) so ToValidUTF8 leaves it in place,
+// yet PostgreSQL text still rejects it (SQLSTATE 22021) — so it
+// must be removed separately.
+//
+// JSONB columns need the separate jsonbClean below: json.Marshal
+// encodes a NUL as the 6-byte escape \u0000, which the text-type
+// json accepts but jsonb rejects (SQLSTATE 22P05).
 func utf8Clean(s string) string {
 	if strings.IndexByte(s, 0) >= 0 {
 		s = strings.ReplaceAll(s, "\x00", "")
 	}
-	return strings.ToValidUTF8(s, "�")
+	return strings.ToValidUTF8(s, "\uFFFD")
 }
 
-// jsonbClean makes marshaled JSON safe for a PostgreSQL jsonb column. json.Marshal
-// faithfully encodes a NUL byte (U+0000) as the 6-byte escape sequence \u0000; the
-// json type stores it, but jsonb rejects it with "unsupported Unicode escape
-// sequence" (SQLSTATE 22P05). Captured HTTP/tool bytes can carry NULs, so drop the
-// escape — this also covers NULs nested inside json.RawMessage fields, which are
-// copied verbatim into the output. Only a *real* escape is stripped: a \u0000 is
-// genuine when preceded by an even number of backslashes, so an escaped-backslash
-// run such as \\u0000 (the literal text u0000) is left intact.
+// jsonbClean makes marshaled JSON safe for a PostgreSQL jsonb
+// column. json.Marshal faithfully encodes a NUL byte (U+0000) as
+// the 6-byte escape sequence \u0000; the json type stores it, but
+// jsonb rejects it with "unsupported Unicode escape sequence"
+// (SQLSTATE 22P05). Captured HTTP/tool bytes can carry NULs, so
+// drop the escape — this also covers NULs nested inside
+// json.RawMessage fields, which are copied verbatim into the
+// output. Only a *real* escape is stripped: a \u0000 is genuine
+// when preceded by an even number of backslashes, so an
+// escaped-backslash run such as \\u0000 (the literal text u0000)
+// is left intact.
 func jsonbClean(b []byte) []byte {
 	if !bytes.Contains(b, []byte("\\u0000")) {
 		return b
@@ -63,7 +74,8 @@ func jsonbClean(b []byte) []byte {
 	return out
 }
 
-// Node is a typed reasoning node (= old task_nodes). kind ∈ goal|intent|finding|hint.
+// Node is a typed reasoning node (= old task_nodes). kind ∈
+// goal|intent|finding|hint.
 type Node struct {
 	FindingID     int64           `json:"finding_id,omitempty"` // populated by finding-aware reads; never inferred from ID
 	FindingNodeID int64           `json:"finding_node_id,omitempty"`
@@ -76,7 +88,7 @@ type Node struct {
 	Origin        string          `json:"origin,omitempty"`
 	Owner         string          `json:"owner,omitempty"`
 	BlockedReason string          `json:"blocked_reason,omitempty"`
-	DeleteReason  string          `json:"delete_reason,omitempty"` // 仅意图假删除(state='deleted')时非空
+	DeleteReason  string          `json:"delete_reason,omitempty"` // only non-empty for soft-deleted intents (state='deleted')
 	Anchors       []int64         `json:"anchors,omitempty"`
 	CreatedAt     time.Time       `json:"created_at"`
 	SourceTaskID  int64           `json:"source_task_id,omitempty"`
@@ -96,15 +108,17 @@ type Activity struct {
 	Detail    string          `json:"-"` // full blob; lazy-loaded, omitted from list payloads
 	Metadata  json.RawMessage `json:"metadata,omitempty"`
 	CreatedAt time.Time       `json:"created_at"`
-	// Token usage — set only on the terminal kind='result' record; nil elsewhere.
+	// Token usage — set only on the terminal kind='result' record;
+	// nil elsewhere.
 	InputTokens      *int  `json:"input_tokens,omitempty"`
 	OutputTokens     *int  `json:"output_tokens,omitempty"`
 	CacheReadTokens  *int  `json:"cache_read_tokens,omitempty"`
 	CacheWriteTokens *int  `json:"cache_write_tokens,omitempty"`
 	SourceTaskID     int64 `json:"source_task_id,omitempty"`
 	Inherited        bool  `json:"inherited,omitempty"`
-	// MainSeg is the main-agent conversation segment (nil for non-mainagent rows;
-	// nil/0 == the original session). Lets the UI route a mainagent row to its segment.
+	// MainSeg is the main-agent conversation segment (nil for
+	// non-mainagent rows; nil/0 == the original session). Lets
+	// the UI route a mainagent row to its segment.
 	MainSeg *int `json:"main_seg,omitempty"`
 }
 
@@ -117,9 +131,10 @@ type TokenUsage struct {
 	CacheWriteTokens int    `json:"cache_write_tokens"`
 }
 
-// SessionTokenUsage is the authoritative completed-run total for one task UI
-// session. Worker sessions are keyed by intent rather than the reusable work#N
-// executor name, so retries and reassignment remain attached to the same row.
+// SessionTokenUsage is the authoritative completed-run total for
+// one task UI session. Worker sessions are keyed by intent rather
+// than the reusable work#N executor name, so retries and
+// reassignment remain attached to the same row.
 type SessionTokenUsage struct {
 	Session          string `json:"session"`
 	InputTokens      int    `json:"input_tokens"`
@@ -128,7 +143,8 @@ type SessionTokenUsage struct {
 	CacheWriteTokens int    `json:"cache_write_tokens"`
 }
 
-// DailyTokenBucket is one day's global token aggregate across all tasks.
+// DailyTokenBucket is one day's global token aggregate across all
+// tasks.
 type DailyTokenBucket struct {
 	Day             string `json:"day"` // "YYYY-MM-DD"
 	InputTokens     int    `json:"input_tokens"`
@@ -136,9 +152,10 @@ type DailyTokenBucket struct {
 	CacheReadTokens int    `json:"cache_read_tokens"`
 }
 
-// TokenDailyAll aggregates token consumption by calendar day (UTC) for the
-// past `days` days across all explorations. Only kind='result' rows carry token
-// counts (the terminal per-run summary), so there is no double-counting.
+// TokenDailyAll aggregates token consumption by calendar day (UTC)
+// for the past `days` days across all explorations. Only
+// kind='result' rows carry token counts (the terminal per-run
+// summary), so there is no double-counting.
 func (d *DB) TokenDailyAll(days int) ([]DailyTokenBucket, error) {
 	if days <= 0 {
 		days = 30
@@ -168,13 +185,15 @@ func (d *DB) TokenDailyAll(days int) ([]DailyTokenBucket, error) {
 	return out, rows.Err()
 }
 
-// ExplorationStore is a handle onto one exploration's reasoning graph + activity.
+// ExplorationStore is a handle onto one exploration's reasoning
+// graph + activity.
 type ExplorationStore struct {
 	db    *DB
 	expID int64
 }
 
-// CreateExploration creates a new exploration root and returns its id.
+// CreateExploration creates a new exploration root and returns its
+// id.
 func (d *DB) CreateExploration(description, goal string) (int64, error) {
 	var id int64
 	err := d.QueryRow(`INSERT INTO explorations(description, goal) VALUES ($1, $2) RETURNING id`, description, goal).Scan(&id)
@@ -193,7 +212,8 @@ func (s *ExplorationStore) Root() (description, goal string, err error) {
 	return d.String, goal, err
 }
 
-// AddNode writes a typed reasoning node with optional anchors to asset ids.
+// AddNode writes a typed reasoning node with optional anchors to
+// asset ids.
 func (s *ExplorationStore) AddNode(kind string, payload map[string]any, priority int, state, origin string, anchors []int64) (int64, error) {
 	raw, _ := json.Marshal(payload)
 	tx, err := s.db.Begin()
@@ -229,10 +249,11 @@ func (s *ExplorationStore) AddGoal(payload map[string]any, origin string) (int64
 	return s.AddNode("goal", payload, 0, "open", origin, nil)
 }
 
-// OriginFactID returns this exploration's root fact id — the KindFact node with
-// state='origin' seeded at task creation (the task root). Every intent traces
-// back to it. Returns 0 (no error) when none exists (legacy explorations created
-// under the old 'begin' root, or none yet).
+// OriginFactID returns this exploration's root fact id — the
+// KindFact node with state='origin' seeded at task creation (the
+// task root). Every intent traces back to it. Returns 0 (no error)
+// when none exists (legacy explorations created under the old
+// 'begin' root, or none yet).
 func (s *ExplorationStore) OriginFactID() (int64, error) {
 	var id int64
 	err := s.db.QueryRow(`SELECT id FROM exploration_nodes WHERE exploration_id=$1 AND kind='fact' AND state='origin' ORDER BY id LIMIT 1`, s.expID).Scan(&id)
@@ -242,11 +263,11 @@ func (s *ExplorationStore) OriginFactID() (int64, error) {
 	return id, err
 }
 
-// Anchor records a node→asset reference edge (many-to-many): it captures which
-// global assets an exploration node touched, as lineage/provenance. The asset
-// graph itself is global and shared — anchoring no longer gates visibility (any
-// task may read any asset via search); it only preserves the reasoning trail.
-// Idempotent.
+// Anchor records a node→asset reference edge (many-to-many): it
+// captures which global assets an exploration node touched, as
+// lineage/provenance. The asset graph itself is global and shared —
+// anchoring no longer gates visibility (any task may read any asset
+// via search); it only preserves the reasoning trail. Idempotent.
 func (s *ExplorationStore) Anchor(nodeID, assetID int64) error {
 	if nodeID <= 0 || assetID <= 0 {
 		return nil
@@ -263,16 +284,18 @@ ON CONFLICT (exploration_id, src_id, rel, dst_id) DO NOTHING`, s.expID, from, re
 	return err
 }
 
-// SetNodeState updates any node's state (never deletes). content_version bumps
-// so a folded member's state flip invalidates its digest's cached body (§5.3).
+// SetNodeState updates any node's state (never deletes).
+// content_version bumps so a folded member's state flip invalidates
+// its digest's cached body (§5.3).
 func (s *ExplorationStore) SetNodeState(id int64, state string) error {
 	_, err := s.db.Exec(`UPDATE exploration_nodes SET state=$1, blocked_reason=NULL, content_version=content_version+1 WHERE id=$2 AND exploration_id=$3`, state, id, s.expID)
 	return err
 }
 
-// UpdateGoalPayload rewrites a goal node's payload text (and optional vulnclass);
-// scoped to kind='goal' so it can never mutate an intent/fact by id. Returns an
-// error if no such goal exists in this exploration.
+// UpdateGoalPayload rewrites a goal node's payload text (and
+// optional vulnclass); scoped to kind='goal' so it can never mutate
+// an intent/fact by id. Returns an error if no such goal exists in
+// this exploration.
 func (s *ExplorationStore) UpdateGoalPayload(id int64, text, vulnclass string) error {
 	payload := map[string]any{"text": text}
 	if vulnclass != "" {
@@ -284,31 +307,33 @@ func (s *ExplorationStore) UpdateGoalPayload(id int64, text, vulnclass string) e
 		return err
 	}
 	if n, _ := res.RowsAffected(); n == 0 {
-		return fmt.Errorf("目标不存在")
+		return fmt.Errorf("goal does not exist")
 	}
 	return nil
 }
 
-// DeleteGoal hard-deletes a goal node; scoped to kind='goal' so it can never drop
-// an intent/fact by id. The edges (spawns) and anchors reference it with ON DELETE
-// CASCADE, so they go with it; activity.node_id is ON DELETE SET NULL. Returns an
-// error if no such goal exists in this exploration.
+// DeleteGoal hard-deletes a goal node; scoped to kind='goal' so it
+// can never drop an intent/fact by id. The edges (spawns) and
+// anchors reference it with ON DELETE CASCADE, so they go with it;
+// activity.node_id is ON DELETE SET NULL. Returns an error if no
+// such goal exists in this exploration.
 func (s *ExplorationStore) DeleteGoal(id int64) error {
 	res, err := s.db.Exec(`DELETE FROM exploration_nodes WHERE id=$1 AND exploration_id=$2 AND kind='goal'`, id, s.expID)
 	if err != nil {
 		return err
 	}
 	if n, _ := res.RowsAffected(); n == 0 {
-		return fmt.Errorf("目标不存在")
+		return fmt.Errorf("goal does not exist")
 	}
 	return nil
 }
 
 // SetIntentState updates an intent node's state.
-// ResetRunningIntents returns any intent left in 'running' back to 'open' so it
-// is re-claimed. Called on startup: a 'running' intent with no live worker (a
-// backend restart or crashed worker goroutine left it stuck) would otherwise spin
-// forever in the UI. Workers resume from their transcript, so reopening is safe.
+// ResetRunningIntents returns any intent left in 'running' back to
+// 'open' so it is re-claimed. Called on startup: a 'running' intent
+// with no live worker (a backend restart or crashed worker
+// goroutine left it stuck) would otherwise spin forever in the UI.
+// Workers resume from their transcript, so reopening is safe.
 func (s *ExplorationStore) ResetRunningIntents() (int64, error) {
 	res, err := s.db.Exec(`UPDATE exploration_nodes SET state='open', completed_at=NULL, blocked_reason=NULL
 WHERE exploration_id=$1 AND kind='intent' AND state='running'`, s.expID)
@@ -319,10 +344,12 @@ WHERE exploration_id=$1 AND kind='intent' AND state='running'`, s.expID)
 	return n, nil
 }
 
-// ReopenIntent flips ONE not-successfully-finished intent (blocked/exhausted/stopped)
-// back to 'open' so a worker re-claims it (graph writes it already produced stay).
-// The worker resumes from its prior LLM transcript instead of restarting from scratch.
-// done/open/running are left untouched. Returns whether a row changed. Used by "重跑".
+// ReopenIntent flips ONE not-successfully-finished intent
+// (blocked/exhausted/stopped) back to 'open' so a worker re-claims
+// it (graph writes it already produced stay). The worker resumes
+// from its prior LLM transcript instead of restarting from scratch.
+// done/open/running are left untouched. Returns whether a row
+// changed. Used by "re-run".
 func (s *ExplorationStore) ReopenIntent(id int64) (bool, error) {
 	res, err := s.db.Exec(`UPDATE exploration_nodes
 SET state='open', completed_at=NULL, blocked_reason=NULL
@@ -335,9 +362,10 @@ WHERE id=$1 AND exploration_id=$2 AND kind='intent'
 	return n > 0, nil
 }
 
-// ReopenBlockedIntents flips EVERY 'blocked' intent in this exploration back to 'open'
-// (batch rerun after e.g. an LLM/network outage that blocked many at once). Returns the
-// number reopened. Workers resume from their transcripts; kept graph writes remain.
+// ReopenBlockedIntents flips EVERY 'blocked' intent in this
+// exploration back to 'open' (batch rerun after e.g. an LLM/network
+// outage that blocked many at once). Returns the number reopened.
+// Workers resume from their transcripts; kept graph writes remain.
 func (s *ExplorationStore) ReopenBlockedIntents() (int64, error) {
 	res, err := s.db.Exec(`UPDATE exploration_nodes SET state='open', completed_at=NULL, blocked_reason=NULL
 WHERE exploration_id=$1 AND kind='intent' AND state='blocked'`, s.expID)
@@ -349,7 +377,8 @@ WHERE exploration_id=$1 AND kind='intent' AND state='blocked'`, s.expID)
 }
 
 func (s *ExplorationStore) SetIntentState(id int64, state string) error {
-	// terminal states stamp completed_at; reopening (back to open/running) clears it.
+	// terminal states stamp completed_at; reopening (back to
+	// open/running) clears it.
 	terminal := state == "done" || state == "blocked" || state == "exhausted" || state == "stopped"
 	_, err := s.db.Exec(`UPDATE exploration_nodes
 SET state=$1, blocked_reason=NULL, content_version=content_version+1, completed_at = CASE WHEN $4 THEN now() ELSE NULL END
@@ -357,9 +386,10 @@ WHERE id=$2 AND exploration_id=$3 AND kind='intent'`, state, id, s.expID, termin
 	return err
 }
 
-// CompareAndSetIntentState transitions one local intent only when its current
-// state still matches expected. It is the state boundary used by pause/resume and
-// worker settlement, so a stale API read cannot overwrite a concurrent finish.
+// CompareAndSetIntentState transitions one local intent only when
+// its current state still matches expected. It is the state
+// boundary used by pause/resume and worker settlement, so a stale
+// API read cannot overwrite a concurrent finish.
 func (s *ExplorationStore) CompareAndSetIntentState(id int64, expected, state string) (bool, error) {
 	terminal := state == "done" || state == "blocked" || state == "exhausted" || state == "stopped"
 	res, err := s.db.Exec(`UPDATE exploration_nodes
@@ -372,9 +402,10 @@ WHERE id=$2 AND exploration_id=$3 AND kind='intent' AND state=$4`, state, id, s.
 	return n == 1, err
 }
 
-// IntentCleanup summarizes the blackboard records removed when a user cancels
-// one worker intent. Global assets and traffic are deliberately not part of this
-// operation; exploration anchors disappear only because their owning nodes do.
+// IntentCleanup summarizes the blackboard records removed when a
+// user cancels one worker intent. Global assets and traffic are
+// deliberately not part of this operation; exploration anchors
+// disappear only because their owning nodes do.
 type IntentCleanup struct {
 	Intents    int64 `json:"intents"`
 	Facts      int64 `json:"facts"`
@@ -382,10 +413,14 @@ type IntentCleanup struct {
 	Activities int64 `json:"activities"`
 }
 
-// SoftDeleteIntent 假删除一个待领/运行中/已暂停的意图:置 state='deleted' 并把用户填写的
-// 删除原因记入 delete_reason 字段,保留意图节点及其全部产出/血缘(不再像旧实现那样在图上
-// 另挂一条 fact)。返回删除前意图的 summary,供 planner 通知使用。副会话随删除态一并清理。
-// 调用方须先停掉运行中的 worker,避免其后续写入。
+// SoftDeleteIntent soft-deletes a pending/running/paused intent:
+// sets state='deleted' and records the user-supplied reason in the
+// delete_reason field, keeping the intent node and all its
+// outputs/lineage (no longer creating a separate fact on the graph
+// like the old implementation). Returns the pre-delete intent
+// summary for the planner to notify. Side-question sessions are
+// cleaned up atomically with the deleted state. The caller must
+// first stop any running worker to prevent its later writes.
 func (s *ExplorationStore) SoftDeleteIntent(id int64, reason string) (string, error) {
 	tx, err := s.db.Begin()
 	if err != nil {
@@ -411,7 +446,10 @@ func (s *ExplorationStore) SoftDeleteIntent(id int64, reason string) (string, er
 		WHERE id=$1 AND exploration_id=$2`, id, s.expID, reason); err != nil {
 		return "", err
 	}
-	// 主意图审计轨迹保留,但副问答会话随删除态原子清理(延迟快照会拒绝它)。
+	// The main intent's audit trail is preserved, but side
+	// question-and-answer sessions are cleaned up atomically with
+	// the deleted state (the delayed snapshot would otherwise
+	// reject it).
 	if _, err := tx.Exec(`DELETE FROM side_question_sessions WHERE intent_id=$1`, id); err != nil {
 		return "", err
 	}
@@ -425,12 +463,20 @@ func (s *ExplorationStore) SoftDeleteIntent(id int64, reason string) (string, er
 	return summary, tx.Commit()
 }
 
-// CancelIntent 物理删除一个意图,以及"仅由该意图支撑"的全部独占子孙节点——从该意图沿
-// yields/derived_from 向下可达、且所有父节点(所有指向它的边的源)都落在删除集内的节点。
-// goal 与 origin fact 永不删除;还被删除集之外的意图/digest 引用的共享节点也保留,以免破坏
-// 其它分支、产生断链。被删的每个 intent 先做 token rollup(保留不可逆计量)并清理其 activity
-// 与副会话;被删的 finding 先删 findings 表行(node_id FK 为 ON DELETE SET NULL,否则留孤儿)。
-// 边随节点 CASCADE 清理,整个清理保持在一个事务内。调用方须先停掉运行中的 worker 防止其后续写入。
+// CancelIntent physically deletes an intent and every exclusive
+// descendant only that intent supports — nodes reachable downward
+// from this intent along yields/derived_from AND whose every parent
+// (every source of an edge into them) is itself in the deletion
+// set. Goals and the origin fact are never deleted; shared nodes
+// still referenced by intents/digests outside the deletion set are
+// also kept, so other branches are not broken and no dangling
+// edges appear. Each deleted intent first does a token rollup
+// (preserving irreversible accounting) and cleans up its activity
+// and side-question sessions; each deleted finding first drops its
+// findings table row (node_id FK is ON DELETE SET NULL, otherwise
+// orphans would remain). Edges cascade with the nodes; the whole
+// cleanup runs in a single transaction. The caller must first
+// stop any running worker to prevent its later writes.
 func (s *ExplorationStore) CancelIntent(id int64) (IntentCleanup, error) {
 	var out IntentCleanup
 	tx, err := s.db.Begin()
@@ -439,8 +485,10 @@ func (s *ExplorationStore) CancelIntent(id int64) (IntentCleanup, error) {
 	}
 	defer tx.Rollback()
 
-	// 锁定意图行确认存在(幂等:已删则 not found)。状态不校验——真删除对任何状态成立,
-	// running 的 worker 由调用方先停。
+	// Lock the intent row to confirm it exists (idempotent:
+	// already deleted -> not found). State is not checked —
+	// physical delete applies in any state, and a running
+	// worker must be stopped by the caller first.
 	if err := tx.QueryRow(`SELECT 1 FROM exploration_nodes
 		WHERE id=$1 AND exploration_id=$2 AND kind='intent' FOR UPDATE`, id, s.expID).Scan(new(int)); err != nil {
 		if err == sql.ErrNoRows {
@@ -449,7 +497,9 @@ func (s *ExplorationStore) CancelIntent(id int64) (IntentCleanup, error) {
 		return out, err
 	}
 
-	// 载入全图节点(判 protected)与边(算向下可达 + 父集)。图规模对真实任务很小。
+	// Load every graph node (to determine "protected") and edge
+	// (to compute downward reachability and parent set). The
+	// graph is small for real tasks.
 	kind := map[int64]string{}
 	protected := map[int64]bool{}
 	nrows, err := tx.Query(`SELECT id, kind, state FROM exploration_nodes WHERE exploration_id=$1`, s.expID)
@@ -465,7 +515,7 @@ func (s *ExplorationStore) CancelIntent(id int64) (IntentCleanup, error) {
 		}
 		kind[nid] = k
 		if k == KindGoal || (k == KindFact && st == StateOrigin) {
-			protected[nid] = true // 目标与任务根事实永不随意图删除
+			protected[nid] = true // goals and task-root facts are never deleted by intent cleanup
 		}
 	}
 	nrows.Close()
@@ -473,8 +523,8 @@ func (s *ExplorationStore) CancelIntent(id int64) (IntentCleanup, error) {
 		return out, err
 	}
 
-	parentsOf := map[int64][]int64{} // dst -> 所有指向它的边的 src(任意 rel,含 covers:被 digest 覆盖的成员因此有 digest 父而被保留)
-	downOf := map[int64][]int64{}    // src -> 沿 yields/derived_from 的向下邻居
+	parentsOf := map[int64][]int64{} // dst -> every src of an edge into it (any rel; this is why digest-covered members are kept via their digest parent)
+	downOf := map[int64][]int64{}    // src -> downward neighbours along yields/derived_from
 	erows, err := tx.Query(`SELECT src_id, rel, dst_id FROM exploration_edges WHERE exploration_id=$1`, s.expID)
 	if err != nil {
 		return out, err
@@ -496,8 +546,11 @@ func (s *ExplorationStore) CancelIntent(id int64) (IntentCleanup, error) {
 		return out, err
 	}
 
-	// 独占级联:从意图向下扩展,一个节点入删除集当且仅当它未被保护、且它的每个父都已在集内
-	// (即除了经过被删节点外再无来路)。迭代到不动点。
+	// Exclusive cascade: extend downward from the intent; a node
+	// enters the deletion set only when it is not protected AND
+	// every one of its parents is already in the set (i.e. there
+	// is no path to it other than through a deleted node).
+	// Iterate to a fixed point.
 	del := map[int64]bool{id: true}
 	for changed := true; changed; {
 		changed = false
@@ -521,7 +574,7 @@ func (s *ExplorationStore) CancelIntent(id int64) (IntentCleanup, error) {
 		}
 	}
 
-	// 按类型分桶。
+	// Bucket by type.
 	var ids, intentIDs, findingIDs []int64
 	for nid := range del {
 		ids = append(ids, nid)
@@ -537,8 +590,10 @@ func (s *ExplorationStore) CancelIntent(id int64) (IntentCleanup, error) {
 		}
 	}
 
-	// 每个被删意图:token rollup(保留不可逆计量)后清 activity。rollup 行 node_id 为 NULL,
-	// 不会被下面按 node_id 的删除命中。
+	// For each deleted intent: roll up tokens (preserving
+	// irreversible accounting), then clean up activity. The
+	// rollup row's node_id is NULL, so it is not hit by the
+	// following per-node_id delete.
 	for _, iid := range intentIDs {
 		tokenBuckets, err := intentTokenRollup(tx, s.expID, iid)
 		if err != nil {
@@ -561,7 +616,7 @@ func (s *ExplorationStore) CancelIntent(id int64) (IntentCleanup, error) {
 				exploration_id, worker, kind, summary, metadata,
 				input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, created_at)
 				VALUES ($1,'token-ledger','result',$2,$3,$4,$5,$6,$7,$8)`,
-				s.expID, fmt.Sprintf("已取消意图 #%d 的 Token 计量", iid), metadata,
+				s.expID, fmt.Sprintf("Token accounting for cancelled intent #%d", iid), metadata,
 				bucket.Usage.InputTokens, bucket.Usage.OutputTokens,
 				bucket.Usage.CacheReadTokens, bucket.Usage.CacheWriteTokens, bucket.Day); err != nil {
 				return out, err
@@ -572,14 +627,16 @@ func (s *ExplorationStore) CancelIntent(id int64) (IntentCleanup, error) {
 		}
 	}
 
-	// finding 节点删除前先删 findings 表行(否则留 node_id=NULL 的孤儿)。
+	// Drop findings table rows before deleting finding nodes
+	// (otherwise node_id=NULL orphans would remain).
 	for _, fid := range findingIDs {
 		if _, err := tx.Exec(`DELETE FROM findings WHERE node_id=$1`, fid); err != nil {
 			return out, err
 		}
 	}
 
-	// 删节点(边随 CASCADE 清理)。逐个删并核对行数,防并发改动。
+	// Delete nodes (edges cascade away). Delete one by one and
+	// check the row count to defend against concurrent changes.
 	var removed int64
 	for _, nid := range ids {
 		res, err := tx.Exec(`DELETE FROM exploration_nodes WHERE id=$1 AND exploration_id=$2`, nid, s.expID)
@@ -601,11 +658,13 @@ type tokenUsageBucket struct {
 	Usage TokenUsage
 }
 
-// intentTokenRollup returns exactly-once usage grouped by its original UTC day.
-// Each result terminates one run. A result carrying usage is authoritative; an
-// older error/cancel result without usage falls back to the latest cumulative
-// usage frame since the previous result. A trailing frame represents a run that
-// was interrupted before its terminal result could be persisted.
+// intentTokenRollup returns exactly-once usage grouped by its
+// original UTC day. Each result terminates one run. A result
+// carrying usage is authoritative; an older error/cancel result
+// without usage falls back to the latest cumulative usage frame
+// since the previous result. A trailing frame represents a run
+// that was interrupted before its terminal result could be
+// persisted.
 func intentTokenRollup(tx *sql.Tx, explorationID, intentID int64) ([]tokenUsageBucket, error) {
 	rows, err := tx.Query(`SELECT kind, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, created_at
 		FROM activity
@@ -654,8 +713,9 @@ func intentTokenRollup(tx *sql.Tx, explorationID, intentID int64) ([]tokenUsageB
 		}
 
 		if hasCurrent {
-			// Preserve a partially populated legacy terminal row by filling only its
-			// missing dimensions from the latest cumulative usage frame.
+			// Preserve a partially populated legacy terminal
+			// row by filling only its missing dimensions from
+			// the latest cumulative usage frame.
 			if hasPending {
 				if !input.Valid {
 					current.InputTokens = pending.InputTokens
@@ -736,10 +796,12 @@ WHERE exploration_id=$1 AND kind=$2 ORDER BY id DESC LIMIT $3`, s.expID, kind, l
 	return scanNodes(rows)
 }
 
-// ListByKindPage returns one newest-first page of nodes of a kind for reverse
-// pagination: up to `limit` nodes with id < `before` (before<=0 = the newest page).
-// hasMore reports whether still-older nodes exist, so a client (e.g. the worker
-// session list) can page past the old fixed cap instead of losing older intents.
+// ListByKindPage returns one newest-first page of nodes of a kind
+// for reverse pagination: up to `limit` nodes with id < `before`
+// (before<=0 = the newest page). hasMore reports whether
+// still-older nodes exist, so a client (e.g. the worker session
+// list) can page past the old fixed cap instead of losing older
+// intents.
 func (s *ExplorationStore) ListByKindPage(kind string, before int64, limit int) ([]*Node, bool, error) {
 	if limit <= 0 {
 		limit = 300
@@ -762,9 +824,10 @@ ORDER BY id DESC LIMIT $4`, s.expID, kind, before, limit+1)
 	return nodes, hasMore, nil
 }
 
-// listByKindPageFiltered is ListByKindPage with an optional summary keyword
-// filter (payload->>'summary' ILIKE %q%). Fetches one extra row so the caller can
-// probe hasMore. Empty q = no filter. Newest-first by id.
+// listByKindPageFiltered is ListByKindPage with an optional
+// summary keyword filter (payload->>'summary' ILIKE %q%). Fetches
+// one extra row so the caller can probe hasMore. Empty q = no
+// filter. Newest-first by id.
 func (s *ExplorationStore) listByKindPageFiltered(kind string, before int64, limit int, q string) ([]*Node, error) {
 	where := `exploration_id=$1 AND kind=$2 AND ($3 <= 0 OR id < $3)`
 	args := []any{s.expID, kind, before}
@@ -782,8 +845,9 @@ WHERE `+where+` ORDER BY id DESC LIMIT $`+fmt.Sprintf("%d", len(args)), args...)
 	return scanNodes(rows)
 }
 
-// countByKindFiltered counts nodes of a kind under the same summary filter, for a
-// page's total. Empty q = count all of that kind.
+// countByKindFiltered counts nodes of a kind under the same
+// summary filter, for a page's total. Empty q = count all of that
+// kind.
 func (s *ExplorationStore) countByKindFiltered(kind, q string) (int, error) {
 	where := `exploration_id=$1 AND kind=$2`
 	args := []any{s.expID, kind}
@@ -796,11 +860,13 @@ func (s *ExplorationStore) countByKindFiltered(kind, q string) (int, error) {
 	return n, err
 }
 
-// CountFinishedIntents counts this exploration's intents in a terminal explored
-// state (done/blocked/exhausted) — graph_overview's done_intents_total, so the planner
-// knows recent_done_intents (capped at a recent window) is a truncated view and
-// stays cautious about "already tried" dedup. Excludes 'stopped' (killed/deleted),
-// matching exactly what recent_done_intents surfaces.
+// CountFinishedIntents counts this exploration's intents in a
+// terminal explored state (done/blocked/exhausted) —
+// graph_overview's done_intents_total, so the planner knows
+// recent_done_intents (capped at a recent window) is a truncated
+// view and stays cautious about "already tried" dedup. Excludes
+// 'stopped' (killed/deleted), matching exactly what
+// recent_done_intents surfaces.
 func (s *ExplorationStore) CountFinishedIntents() (int, error) {
 	var n int
 	err := s.db.QueryRow(`SELECT COUNT(*) FROM exploration_nodes
@@ -808,9 +874,10 @@ WHERE exploration_id=$1 AND kind='intent' AND state IN ('done','blocked','exhaus
 	return n, err
 }
 
-// CountOpenIntents counts this exploration's open intents — graph_overview's
-// frontier_open, so the planner knows open_intents (capped at the top-N by
-// priority) is a truncated view and there may be more claimable work.
+// CountOpenIntents counts this exploration's open intents —
+// graph_overview's frontier_open, so the planner knows
+// open_intents (capped at the top-N by priority) is a truncated
+// view and there may be more claimable work.
 func (s *ExplorationStore) CountOpenIntents() (int, error) {
 	var n int
 	err := s.db.QueryRow(`SELECT COUNT(*) FROM exploration_nodes
@@ -818,7 +885,8 @@ WHERE exploration_id=$1 AND kind='intent' AND state='open'`, s.expID).Scan(&n)
 	return n, err
 }
 
-// GetNode returns one node of this exploration by id (nil, nil if not found).
+// GetNode returns one node of this exploration by id (nil, nil if
+// not found).
 func (s *ExplorationStore) GetNode(id int64) (*Node, error) {
 	n, err := scanNode(s.db.QueryRow(`SELECT `+nodeCols+` FROM exploration_nodes WHERE id=$1 AND exploration_id=$2`, id, s.expID))
 	if err == sql.ErrNoRows {
@@ -840,7 +908,8 @@ func (s *ExplorationStore) Nodes(limit int) ([]*Node, error) {
 	return scanNodes(rows)
 }
 
-// NodeFilter narrows a NodesPage query. Empty fields include every value.
+// NodeFilter narrows a NodesPage query. Empty fields include every
+// value.
 type NodeFilter struct {
 	Kinds  []string // exploration_nodes.kind
 	States []string // exploration_nodes.state
@@ -848,11 +917,12 @@ type NodeFilter struct {
 	Asc    bool     // true = oldest first (replay); default newest first (broadcast)
 }
 
-// NodesPage returns one 1-based page of this exploration's nodes plus the total
-// matching count. The 播报板 reads the graph as a time series, so it pages in SQL
-// rather than pulling the whole graph like Nodes does. Ordering is by id, which
-// is BIGSERIAL and therefore creation order — stable when several nodes share a
-// created_at second.
+// NodesPage returns one 1-based page of this exploration's nodes
+// plus the total matching count. The broadcast board reads the
+// graph as a time series, so it pages in SQL rather than pulling
+// the whole graph like Nodes does. Ordering is by id, which is
+// BIGSERIAL and therefore creation order — stable when several
+// nodes share a created_at second.
 func (s *ExplorationStore) NodesPage(f NodeFilter, page, size int) ([]*Node, int, error) {
 	if page < 1 {
 		page = 1
@@ -884,7 +954,9 @@ func (s *ExplorationStore) NodesPage(f NodeFilter, page, size int) ([]*Node, int
 		args = append(args, "%"+q+"%")
 		mark := "$" + fmt.Sprint(len(args))
 		ors := []string{"payload::text ILIKE " + mark, "COALESCE(origin,'') ILIKE " + mark}
-		// 纯数字(或 UI 里带 # 前缀的形式,如「#41」)当作节点 id 精确匹配,方便直接定位某个节点。
+		// A pure number (or the "#41" form shown in the UI)
+		// is treated as an exact node id match, for direct
+		// location of a specific node.
 		if idStr := strings.TrimPrefix(q, "#"); idStr != "" {
 			if id, err := strconv.ParseInt(idStr, 10, 64); err == nil {
 				args = append(args, id)
@@ -918,8 +990,9 @@ func (s *ExplorationStore) NodesPage(f NodeFilter, page, size int) ([]*Node, int
 	return nodes, total, nil
 }
 
-// NodesByIDs loads the given nodes of this exploration in id order. Used to
-// resolve the neighbours of a 播报板 page without fetching the whole graph.
+// NodesByIDs loads the given nodes of this exploration in id order.
+// Used to resolve the neighbours of a broadcast-board page without
+// fetching the whole graph.
 func (s *ExplorationStore) NodesByIDs(ids []int64) ([]*Node, error) {
 	if len(ids) == 0 {
 		return nil, nil
@@ -940,8 +1013,9 @@ WHERE exploration_id=$1 AND id IN (`+strings.Join(marks, ",")+`) ORDER BY id`, a
 	return scanNodes(rows)
 }
 
-// EdgesTouching returns every edge with one end among ids — the 播报板 uses it to
-// spell out where a node came from and what it produced.
+// EdgesTouching returns every edge with one end among ids — the
+// broadcast board uses it to spell out where a node came from and
+// what it produced.
 func (s *ExplorationStore) EdgesTouching(ids []int64) ([]Edge, error) {
 	if len(ids) == 0 {
 		return nil, nil
@@ -999,10 +1073,11 @@ func (s *ExplorationStore) Edges(limit int) ([]Edge, error) {
 	return out, rows.Err()
 }
 
-// FactsYielded returns the ids of fact nodes an intent produced (intent --yields-->
-// fact), oldest first. Used to spell out the round's incremental facts to the planner
-// alongside the finished worker's output. Best-effort: returns nil for an intent with
-// no facts (or a missing one).
+// FactsYielded returns the ids of fact nodes an intent produced
+// (intent --yields--> fact), oldest first. Used to spell out the
+// round's incremental facts to the planner alongside the finished
+// worker's output. Best-effort: returns nil for an intent with no
+// facts (or a missing one).
 func (s *ExplorationStore) FactsYielded(intentID int64) ([]int64, error) {
 	rows, err := s.db.Query(`SELECT n.id
 		FROM exploration_edges e
@@ -1024,13 +1099,15 @@ func (s *ExplorationStore) FactsYielded(intentID int64) ([]int64, error) {
 	return ids, rows.Err()
 }
 
-// FindingLineage returns the sub-DAG that leads FROM the exploration root TO the
-// given node: the node itself plus all its ancestors (nodes reverse-reachable by
-// following edges backward), and every edge whose both endpoints are in that set.
-// Used to render "how this finding was reached" — origin → … → finding. Returns
-// empty (not error) for a nonexistent node.
+// FindingLineage returns the sub-DAG that leads FROM the
+// exploration root TO the given node: the node itself plus all
+// its ancestors (nodes reverse-reachable by following edges
+// backward), and every edge whose both endpoints are in that set.
+// Used to render "how this finding was reached" — origin → … →
+// finding. Returns empty (not error) for a nonexistent node.
 func (s *ExplorationStore) FindingLineage(nodeID int64) ([]*Node, []Edge, error) {
-	// anc = the node + everything that can reach it via edges (walk src<-dst).
+	// anc = the node + everything that can reach it via edges
+	// (walk src<-dst).
 	nodeRows, err := s.db.Query(`
 WITH RECURSIVE anc(id) AS (
     SELECT $2::bigint
@@ -1054,7 +1131,8 @@ ORDER BY id`, s.expID, nodeID)
 	if len(nodes) == 0 {
 		return nil, nil, nil
 	}
-	// edges among the ancestor set only (the lineage's internal relations).
+	// edges among the ancestor set only (the lineage's internal
+	// relations).
 	edgeRows, err := s.db.Query(`
 WITH RECURSIVE anc(id) AS (
     SELECT $2::bigint
@@ -1084,9 +1162,10 @@ WHERE exploration_id = $1
 	return nodes, edges, edgeRows.Err()
 }
 
-// FindingIntents maps each finding id to the intent that produced it (the
-// intent --yields--> finding edge; report_finding links it). Findings with no
-// producing intent are absent. Precise (JOIN, no edge-scan limit).
+// FindingIntents maps each finding id to the intent that produced
+// it (the intent --yields--> finding edge; report_finding links
+// it). Findings with no producing intent are absent. Precise
+// (JOIN, no edge-scan limit).
 func (s *ExplorationStore) FindingIntents() (map[int64]int64, error) {
 	rows, err := s.db.Query(`SELECT e.dst_id, e.src_id
 FROM exploration_edges e
@@ -1107,9 +1186,10 @@ WHERE e.exploration_id=$1 AND e.rel=$2 AND n.kind='finding'`, s.expID, RelYields
 	return out, rows.Err()
 }
 
-// FindingIntentsTerminal is the inherited-history variant: it returns finding
-// lineage only when the producing intent has reached an immutable terminal
-// state. This keeps a source task's live worker topology private.
+// FindingIntentsTerminal is the inherited-history variant: it
+// returns finding lineage only when the producing intent has
+// reached an immutable terminal state. This keeps a source task's
+// live worker topology private.
 func (s *ExplorationStore) FindingIntentsTerminal() (map[int64]int64, error) {
 	rows, err := s.db.Query(`SELECT e.dst_id, e.src_id
 	FROM exploration_edges e
@@ -1132,7 +1212,8 @@ func (s *ExplorationStore) FindingIntentsTerminal() (map[int64]int64, error) {
 	return out, rows.Err()
 }
 
-// Frontier returns open intents ordered by priority desc then id (FIFO tiebreak).
+// Frontier returns open intents ordered by priority desc then id
+// (FIFO tiebreak).
 func (s *ExplorationStore) Frontier(limit int) ([]*Node, error) {
 	if limit <= 0 {
 		limit = 50
@@ -1147,11 +1228,13 @@ ORDER BY priority DESC, id ASC LIMIT $2`, s.expID, limit)
 	return scanNodes(rows)
 }
 
-// HasActiveIntent reports whether this exploration has any intent still in play
-// (state open OR running). Used to decide whether to kick the FIRST planner round:
-// a seeded task's intent may already have been claimed (open→running) by a worker
-// before the check, so counting only 'open' (Frontier) races with worker claim and
-// wrongly kicks a redundant first round. Counting open+running is race-proof.
+// HasActiveIntent reports whether this exploration has any intent
+// still in play (state open OR running). Used to decide whether
+// to kick the FIRST planner round: a seeded task's intent may
+// already have been claimed (open→running) by a worker before the
+// check, so counting only 'open' (Frontier) races with worker
+// claim and wrongly kicks a redundant first round. Counting
+// open+running is race-proof.
 func (s *ExplorationStore) HasActiveIntent() (bool, error) {
 	var exists bool
 	err := s.db.QueryRow(`SELECT EXISTS(SELECT 1 FROM exploration_nodes
@@ -1159,9 +1242,12 @@ WHERE exploration_id=$1 AND kind='intent' AND state IN ('open','running'))`, s.e
 	return exists, err
 }
 
-// HasOpenGoal reports whether this exploration still has any goal in state 'open'.
-// false ⇒ 所有目标已 met/abandoned（或本任务无目标）⇒ 进入 goalless（人工直投）分支：
-// planner 停跑，任务是否结束改由 frontier 是否抽干决定。met 与 abandoned 都算"已了结"。
+// HasOpenGoal reports whether this exploration still has any goal
+// in state 'open'. false ⇒ all goals are met or abandoned (or
+// this task has no goals) ⇒ enter the goalless (manual-only)
+// branch: the planner stops, and whether the task is over is
+// decided by whether the frontier is empty. met and abandoned
+// both count as "settled".
 func (s *ExplorationStore) HasOpenGoal() (bool, error) {
 	var exists bool
 	err := s.db.QueryRow(`SELECT EXISTS(SELECT 1 FROM exploration_nodes
@@ -1169,7 +1255,8 @@ WHERE exploration_id=$1 AND kind='goal' AND state='open')`, s.expID).Scan(&exist
 	return exists, err
 }
 
-// ClaimIntent atomically moves an open intent to running. Returns true if claimed.
+// ClaimIntent atomically moves an open intent to running. Returns
+// true if claimed.
 func (s *ExplorationStore) ClaimIntent(id int64, owner string) (bool, error) {
 	res, err := s.db.Exec(`UPDATE exploration_nodes SET state='running', owner=$1
 WHERE id=$2 AND exploration_id=$3 AND kind='intent' AND state='open'`, owner, id, s.expID)
@@ -1216,15 +1303,20 @@ RETURNING id`, s.expID, a.NodeID, utf8Clean(a.Worker), utf8Clean(a.Kind), utf8Cl
 	return id, err
 }
 
-// ExplorationDiag probes, at the moment of an activity FK violation (23503), why the
-// parent row is unreachable. It reports whether the exploration row still exists, how
-// many task rows reference it (a live task should keep exactly 1 — and RESTRICT on
-// tasks.exploration_id means the exploration CANNOT be deleted while that row lives),
-// and the current MAX(explorations.id). Together these tell apart the failure modes:
-//   - expExists=false, taskRefs=0 → the whole row set is gone (DB reset / wrong DB).
-//   - expExists=false, taskRefs=1 → impossible under RESTRICT; would mean a broken FK.
-//   - expExists=true              → the write's expID is NOT this exploration (stale/
-//     wrong id in the in-memory store); compare against Store.ID().
+// ExplorationDiag probes, at the moment of an activity FK
+// violation (23503), why the parent row is unreachable. It reports
+// whether the exploration row still exists, how many task rows
+// reference it (a live task should keep exactly 1 — and RESTRICT
+// on tasks.exploration_id means the exploration CANNOT be deleted
+// while that row lives), and the current MAX(explorations.id).
+// Together these tell apart the failure modes:
+//   - expExists=false, taskRefs=0 → the whole row set is gone
+//     (DB reset / wrong DB).
+//   - expExists=false, taskRefs=1 → impossible under RESTRICT;
+//     would mean a broken FK.
+//   - expExists=true              → the write's expID is NOT this
+//     exploration (stale / wrong id in the in-memory store);
+//     compare against Store.ID().
 func (d *DB) ExplorationDiag(expID int64) (expExists bool, taskRefs int, maxExpID int64, err error) {
 	err = d.QueryRow(`SELECT
 		EXISTS(SELECT 1 FROM explorations WHERE id=$1),
@@ -1233,8 +1325,9 @@ func (d *DB) ExplorationDiag(expID int64) (expExists bool, taskRefs int, maxExpI
 	return
 }
 
-// TokenTotal sums token usage across ALL workers for this exploration (whole-task
-// total). Same source as TokenStatsByWorker (kind='result' rows), just ungrouped.
+// TokenTotal sums token usage across ALL workers for this
+// exploration (whole-task total). Same source as
+// TokenStatsByWorker (kind='result' rows), just ungrouped.
 func (s *ExplorationStore) TokenTotal() (TokenUsage, error) {
 	var u TokenUsage
 	err := s.db.QueryRow(`SELECT
@@ -1245,9 +1338,9 @@ func (s *ExplorationStore) TokenTotal() (TokenUsage, error) {
 	return u, err
 }
 
-// TokenTotalsAll returns the whole-task token total for every exploration in one
-// query (exploration_id → total), so the task list can show per-task consumption
-// without a query per row.
+// TokenTotalsAll returns the whole-task token total for every
+// exploration in one query (exploration_id → total), so the task
+// list can show per-task consumption without a query per row.
 func (d *DB) TokenTotalsAll() (map[int64]TokenUsage, error) {
 	rows, err := d.Query(`SELECT exploration_id,
 		COALESCE(SUM(input_tokens),0), COALESCE(SUM(output_tokens),0),
@@ -1269,10 +1362,12 @@ func (d *DB) TokenTotalsAll() (map[int64]TokenUsage, error) {
 	return out, rows.Err()
 }
 
-// LastActivityAll returns the unix time of the most recent activity per
-// exploration (exploration_id → max created_at epoch), one query for all tasks.
-// Persisted (unlike Engine.LastActivity's in-memory map), so it survives restarts
-// and gives终态任务 a stable "ran until" time for computing run duration.
+// LastActivityAll returns the unix time of the most recent
+// activity per exploration (exploration_id → max created_at
+// epoch), one query for all tasks. Persisted (unlike
+// Engine.LastActivity's in-memory map), so it survives restarts
+// and gives terminal tasks a stable "ran until" time for
+// computing run duration.
 func (d *DB) LastActivityAll() (map[int64]int64, error) {
 	rows, err := d.Query(`SELECT exploration_id, EXTRACT(EPOCH FROM MAX(created_at))::bigint FROM activity GROUP BY exploration_id`)
 	if err != nil {
@@ -1293,8 +1388,9 @@ func (d *DB) LastActivityAll() (map[int64]int64, error) {
 // GoalCounts is the goal summary for one exploration.
 type GoalCounts struct{ Total, Met int }
 
-// FindingSeverityCounts breaks a task's findings down by severity for the task
-// list (severity 白名单外/为空的记录不计入任一档)。
+// FindingSeverityCounts breaks a task's findings down by severity
+// for the task list (records outside the severity white-list or
+// with an empty severity are not counted in any bucket).
 type FindingSeverityCounts struct{ Critical, High, Medium, Low int }
 
 // TaskListMetrics contains the aggregates rendered in task lists.
@@ -1302,13 +1398,14 @@ type TaskListMetrics struct {
 	Tokens         TokenUsage
 	LastActivity   int64
 	Goals          GoalCounts
-	RunningIntents int                   // kind='intent' 且 state='running' 的条数，即运行中 Worker 数
-	Findings       FindingSeverityCounts // findings 表里该任务的漏洞数（按严重度分档）
+	RunningIntents int // count of kind='intent' AND state='running' rows, i.e. running workers
+	Findings       FindingSeverityCounts // finding count for the task in the findings table (broken down by severity)
 }
 
-// TaskListMetricsAll returns list aggregates for every live task in one query.
-// The lateral lookups use the per-exploration indexes instead of grouping the
-// complete activity history on every poll.
+// TaskListMetricsAll returns list aggregates for every live task
+// in one query. The lateral lookups use the per-exploration
+// indexes instead of grouping the complete activity history on
+// every poll.
 func (d *DB) TaskListMetricsAll() (map[int64]TaskListMetrics, error) {
 	rows, err := d.Query(`
 		SELECT task.exploration_id,
@@ -1390,8 +1487,9 @@ func (d *DB) TaskListMetricsAll() (map[int64]TaskListMetrics, error) {
 	return out, rows.Err()
 }
 
-// GoalCountsAll returns goal totals (total / met) per exploration id, one query
-// for all tasks — used by listTasks so the task list shows progress for every task.
+// GoalCountsAll returns goal totals (total / met) per exploration
+// id, one query for all tasks — used by listTasks so the task
+// list shows progress for every task.
 func (d *DB) GoalCountsAll() (map[int64]GoalCounts, error) {
 	rows, err := d.Query(`
 		SELECT exploration_id,
@@ -1416,8 +1514,9 @@ func (d *DB) GoalCountsAll() (map[int64]GoalCounts, error) {
 	return out, rows.Err()
 }
 
-// TokenStatsByWorker sums token usage per worker for this exploration (from the
-// kind='result' records that carry usage). Used by the per-agent token display.
+// TokenStatsByWorker sums token usage per worker for this
+// exploration (from the kind='result' records that carry usage).
+// Used by the per-agent token display.
 func (s *ExplorationStore) TokenStatsByWorker() ([]TokenUsage, error) {
 	rows, err := s.db.Query(`SELECT COALESCE(worker,''),
 		COALESCE(SUM(input_tokens),0), COALESCE(SUM(output_tokens),0),
@@ -1439,9 +1538,10 @@ func (s *ExplorationStore) TokenStatsByWorker() ([]TokenUsage, error) {
 	return out, rows.Err()
 }
 
-// TokenStatsBySession aggregates every persisted completed run, independent of
-// activity-history pagination. Main/planner use fixed keys; Worker executions use
-// their intent node id, even when a different work#N process handled a retry.
+// TokenStatsBySession aggregates every persisted completed run,
+// independent of activity-history pagination. Main/planner use
+// fixed keys; Worker executions use their intent node id, even
+// when a different work#N process handled a retry.
 func (s *ExplorationStore) TokenStatsBySession() ([]SessionTokenUsage, error) {
 	rows, err := s.db.Query(`SELECT
 		CASE
@@ -1474,8 +1574,8 @@ func (s *ExplorationStore) TokenStatsBySession() ([]SessionTokenUsage, error) {
 	return out, rows.Err()
 }
 
-// ActivityList returns steps after sinceID (exclusive), optionally filtered by node.
-// Returns items and the new cursor (max id seen).
+// ActivityList returns steps after sinceID (exclusive), optionally
+// filtered by node. Returns items and the new cursor (max id seen).
 func (s *ExplorationStore) ActivityList(nodeID *int64, sinceID int64, limit int) ([]Activity, int64, error) {
 	if limit <= 0 {
 		limit = 300
@@ -1510,10 +1610,11 @@ FROM activity WHERE exploration_id=$1 AND id>$2 ORDER BY id LIMIT $3`, s.expID, 
 	return out, cursor, rows.Err()
 }
 
-// ActivityListForTerminalIntent is the inherited, incremental-read boundary.
-// The intent state check and activity read happen in one statement so a source
-// intent reopened between API-level checks cannot expose its new in-flight trace.
-// Model reasoning and accounting rows are never inherited.
+// ActivityListForTerminalIntent is the inherited, incremental-read
+// boundary. The intent state check and activity read happen in one
+// statement so a source intent reopened between API-level checks
+// cannot expose its new in-flight trace. Model reasoning and
+// accounting rows are never inherited.
 func (s *ExplorationStore) ActivityListForTerminalIntent(nodeID, sinceID int64, limit int) ([]Activity, int64, error) {
 	if limit <= 0 {
 		limit = 300
@@ -1547,15 +1648,20 @@ func (s *ExplorationStore) ActivityListForTerminalIntent(nodeID, sinceID int64, 
 	return out, cursor, rows.Err()
 }
 
-// ActivitySessionFilter selects one UI "session" within a task's activity stream.
-// Exactly one field is meaningful:
-//   - Main == true  → the main-agent session (worker="mainagent") for one segment
-//     (MainSeg; nil/0 = the original segment, which also matches legacy NULL rows).
+// ActivitySessionFilter selects one UI "session" within a task's
+// activity stream. Exactly one field is meaningful:
+//   - Main == true  → the main-agent session (worker="mainagent")
+//     for one segment (MainSeg; nil/0 = the original segment,
+//     which also matches legacy NULL rows).
 //   - Worker != ""  → filter by worker name (Plan = "planner").
-//     Goal Agent 的第 0 轮拆解也以 worker="planner" 落库，故 Plan 会话完整覆盖 Goal+Planner。
-//   - NodeID != nil → a Worker session, filtered by node_id (= intent id).
+//     The Goal Agent's round-0 decomposition is also stored with
+//     worker="planner", so the Plan session fully covers
+//     Goal+Planner.
+//   - NodeID != nil → a Worker session, filtered by node_id (=
+//     intent id).
 //
-// A zero value (all empty) matches the whole task (no session filter).
+// A zero value (all empty) matches the whole task (no session
+// filter).
 type ActivitySessionFilter struct {
 	Worker  string
 	NodeID  *int64
@@ -1583,11 +1689,13 @@ func (f ActivitySessionFilter) cond(argStart int) (string, []any) {
 	}
 }
 
-// ActivityPage returns one page for reverse (newest-first) pagination of a session:
-// up to `limit` steps ending before id `before` (exclusive; before<=0 = the latest
-// page), returned in ASCENDING id order for direct display. hasMore reports whether
-// still-older steps exist before the returned window (so the client can stop loading
-// on scroll-up). Summary-only columns — detail is lazy-loaded via ActivityDetail.
+// ActivityPage returns one page for reverse (newest-first)
+// pagination of a session: up to `limit` steps ending before id
+// `before` (exclusive; before<=0 = the latest page), returned in
+// ASCENDING id order for direct display. hasMore reports whether
+// still-older steps exist before the returned window (so the
+// client can stop loading on scroll-up). Summary-only columns —
+// detail is lazy-loaded via ActivityDetail.
 func (s *ExplorationStore) ActivityPage(f ActivitySessionFilter, before int64, limit int) ([]Activity, bool, error) {
 	if limit <= 0 {
 		limit = 200
@@ -1624,7 +1732,8 @@ ORDER BY id DESC LIMIT $%d`, cond, beforeArg, beforeArg, limitArg)
 	if hasMore {
 		desc = desc[:limit]
 	}
-	// reverse the newest-first window into ascending id order for display.
+	// reverse the newest-first window into ascending id order
+	// for display.
 	out := make([]Activity, len(desc))
 	for i, a := range desc {
 		out[len(desc)-1-i] = a
@@ -1632,9 +1741,10 @@ ORDER BY id DESC LIMIT $%d`, cond, beforeArg, beforeArg, limitArg)
 	return out, hasMore, nil
 }
 
-// ActivityPageForTerminalIntent is the inherited session-history boundary. It
-// combines ownership, terminal-state and row-kind checks in one query, closing
-// the race where a previously completed source intent is reopened before paging.
+// ActivityPageForTerminalIntent is the inherited session-history
+// boundary. It combines ownership, terminal-state and row-kind
+// checks in one query, closing the race where a previously
+// completed source intent is reopened before paging.
 func (s *ExplorationStore) ActivityPageForTerminalIntent(nodeID, before int64, limit int) ([]Activity, bool, error) {
 	if limit <= 0 {
 		limit = 200
@@ -1676,10 +1786,11 @@ func (s *ExplorationStore) ActivityPageForTerminalIntent(nodeID, before int64, l
 	return out, hasMore, nil
 }
 
-// ActivityMaxID returns the task's current maximum activity id (0 when empty). It is
-// the task-level snapshot cursor handed to the SSE stream so history (id<=cursor) and
-// the live tail (id>cursor) meet with no gap — deliberately task-level, not per
-// session, since one SSE covers the whole task.
+// ActivityMaxID returns the task's current maximum activity id (0
+// when empty). It is the task-level snapshot cursor handed to the
+// SSE stream so history (id<=cursor) and the live tail (id>cursor)
+// meet with no gap — deliberately task-level, not per session,
+// since one SSE covers the whole task.
 func (s *ExplorationStore) ActivityMaxID() (int64, error) {
 	var max sql.NullInt64
 	err := s.db.QueryRow(`SELECT MAX(id) FROM activity WHERE exploration_id=$1`, s.expID).Scan(&max)
@@ -1689,24 +1800,27 @@ func (s *ExplorationStore) ActivityMaxID() (int64, error) {
 	return max.Int64, nil
 }
 
-// MainSession is one resettable main-agent conversation segment of a task. Segment 0
-// is the original session (implicit, never stored); further segments are created by
-// "新建会话" to start the main agent on a clean transcript while the task's graph,
+// MainSession is one resettable main-agent conversation segment
+// of a task. Segment 0 is the original session (implicit, never
+// stored); further segments are created by "new session" to start
+// the main agent on a clean transcript while the task's graph,
 // assets and goal stay shared.
 type MainSession struct {
 	Seq       int       `json:"seq"`
 	CreatedAt time.Time `json:"created_at"`
 }
 
-// CurrentMainSeg returns the highest main-session segment (0 when none created yet).
+// CurrentMainSeg returns the highest main-session segment (0 when
+// none created yet).
 func (s *ExplorationStore) CurrentMainSeg() (int, error) {
 	var seg int
 	err := s.db.QueryRow(`SELECT COALESCE(MAX(seq),0) FROM main_sessions WHERE exploration_id=$1`, s.expID).Scan(&seg)
 	return seg, err
 }
 
-// ListMainSessions returns every main-session segment newest-first, always including
-// the implicit original segment 0. Segment 0 carries no stored timestamp.
+// ListMainSessions returns every main-session segment
+// newest-first, always including the implicit original segment 0.
+// Segment 0 carries no stored timestamp.
 func (s *ExplorationStore) ListMainSessions() ([]MainSession, error) {
 	rows, err := s.db.Query(`SELECT seq, created_at FROM main_sessions WHERE exploration_id=$1 ORDER BY seq DESC`, s.expID)
 	if err != nil {
@@ -1728,9 +1842,10 @@ func (s *ExplorationStore) ListMainSessions() ([]MainSession, error) {
 	return out, nil
 }
 
-// NewMainSession creates the next main-session segment (seq = current+1) and returns
-// it. It touches only main_sessions — the task's exploration graph/assets/goal are
-// untouched, so the new session starts with a clean transcript over the same task.
+// NewMainSession creates the next main-session segment (seq =
+// current+1) and returns it. It touches only main_sessions — the
+// task's exploration graph/assets/goal are untouched, so the new
+// session starts with a clean transcript over the same task.
 func (s *ExplorationStore) NewMainSession() (MainSession, error) {
 	var m MainSession
 	err := s.db.QueryRow(`
@@ -1750,9 +1865,10 @@ func (s *ExplorationStore) ActivityDetail(id int64) (string, error) {
 	return d.String, err
 }
 
-// scanTrace reads the summary-only column set shared by the worker-trace tools
-// (ActivityTrace / ActivityTraceSearch). Detail is never selected here — it is
-// pulled separately, on demand, via ActivityByIDs.
+// scanTrace reads the summary-only column set shared by the
+// worker-trace tools (ActivityTrace / ActivityTraceSearch).
+// Detail is never selected here — it is pulled separately, on
+// demand, via ActivityByIDs.
 func scanTrace(rows *sql.Rows) ([]Activity, error) {
 	out := []Activity{}
 	for rows.Next() {
@@ -1767,10 +1883,11 @@ func scanTrace(rows *sql.Rows) ([]Activity, error) {
 
 const traceCols = `id, node_id, COALESCE(worker,''), COALESCE(kind,''), COALESCE(tool,''), is_error, COALESCE(summary,'')`
 
-// ActivityTrace lists one work's steps (by intent/node id) for the trace tools:
-// summaries only (detail is lazy — fetch via ActivityByIDs). thinking/usage rows
-// are dropped so the caller sees the work's actions + observations, not the
-// model's internal reasoning or token-accounting noise.
+// ActivityTrace lists one work's steps (by intent/node id) for
+// the trace tools: summaries only (detail is lazy — fetch via
+// ActivityByIDs). thinking/usage rows are dropped so the caller
+// sees the work's actions + observations, not the model's
+// internal reasoning or token-accounting noise.
 func (s *ExplorationStore) ActivityTrace(nodeID int64, limit int) ([]Activity, error) {
 	if limit <= 0 {
 		limit = 500
@@ -1785,8 +1902,8 @@ ORDER BY id LIMIT $3`, s.expID, nodeID, limit)
 	return scanTrace(rows)
 }
 
-// ActivityTraceForTerminalIntent returns one inherited work trace only while its
-// source intent is still terminal at query time.
+// ActivityTraceForTerminalIntent returns one inherited work trace
+// only while its source intent is still terminal at query time.
 func (s *ExplorationStore) ActivityTraceForTerminalIntent(nodeID int64, limit int) ([]Activity, error) {
 	if limit <= 0 {
 		limit = 500
@@ -1805,10 +1922,12 @@ func (s *ExplorationStore) ActivityTraceForTerminalIntent(nodeID int64, limit in
 	return scanTrace(rows)
 }
 
-// ActivityTraceSearch finds steps whose summary OR detail matches q
-// (case-insensitive), returning summaries only. nodeID != nil scopes to one work;
-// nil searches across ALL works (node_id IS NOT NULL — planner/main steps have no
-// node_id, so this cleanly means "worker traces"). thinking/usage rows dropped.
+// ActivityTraceSearch finds steps whose summary OR detail matches
+// q (case-insensitive), returning summaries only. nodeID != nil
+// scopes to one work; nil searches across ALL works
+// (node_id IS NOT NULL — planner/main steps have no node_id, so
+// this cleanly means "worker traces"). thinking/usage rows
+// dropped.
 func (s *ExplorationStore) ActivityTraceSearch(nodeID *int64, q string, limit int) ([]Activity, error) {
 	if limit <= 0 {
 		limit = 100
@@ -1832,8 +1951,9 @@ AND (summary ILIKE $2 OR detail ILIKE $2) ORDER BY id LIMIT $3`, s.expID, like, 
 	return scanTrace(rows)
 }
 
-// ActivityTraceSearchForTerminalIntent is the scoped inherited search variant;
-// terminal eligibility is evaluated by the same statement that reads the rows.
+// ActivityTraceSearchForTerminalIntent is the scoped inherited
+// search variant; terminal eligibility is evaluated by the same
+// statement that reads the rows.
 func (s *ExplorationStore) ActivityTraceSearchForTerminalIntent(nodeID int64, q string, limit int) ([]Activity, error) {
 	if limit <= 0 {
 		limit = 100
@@ -1854,8 +1974,9 @@ func (s *ExplorationStore) ActivityTraceSearchForTerminalIntent(nodeID int64, q 
 	return scanTrace(rows)
 }
 
-// ActivityTraceSearchTerminalIntents searches inherited worker history without
-// exposing planner/main rows or work that is still open/running in the source.
+// ActivityTraceSearchTerminalIntents searches inherited worker
+// history without exposing planner/main rows or work that is
+// still open/running in the source.
 func (s *ExplorationStore) ActivityTraceSearchTerminalIntents(q string, limit int) ([]Activity, error) {
 	if limit <= 0 {
 		limit = 100
@@ -1876,8 +1997,9 @@ func (s *ExplorationStore) ActivityTraceSearchTerminalIntents(q string, limit in
 	return scanTrace(rows)
 }
 
-// AssetRef is a compact exploration node (intent/fact/finding) that references an
-// asset via an anchor — for the coverage graph's node drawer.
+// AssetRef is a compact exploration node (intent/fact/finding)
+// that references an asset via an anchor — for the coverage
+// graph's node drawer.
 type AssetRef struct {
 	ID           int64  `json:"id"`
 	Kind         string `json:"kind"`
@@ -1887,8 +2009,9 @@ type AssetRef struct {
 	Inherited    bool   `json:"inherited,omitempty"`
 }
 
-// AssetRefs returns the intents / facts / findings in THIS exploration anchored to
-// the given asset id (newest first) — what this task tested / concluded about it.
+// AssetRefs returns the intents / facts / findings in THIS
+// exploration anchored to the given asset id (newest first) —
+// what this task tested / concluded about it.
 func (s *ExplorationStore) AssetRefs(assetID int64) ([]AssetRef, error) {
 	if assetID <= 0 {
 		return []AssetRef{}, nil
@@ -1923,10 +2046,12 @@ ORDER BY en.id DESC`, assetID, s.expID)
 	return out, rows.Err()
 }
 
-// ActivityTraceSearchExcluding keyword-searches every node's steps in this
-// exploration EXCEPT one node's own (excludeNodeID) — so a worker's
-// search_all_worker_traces doesn't return its own in-progress trace (which is
-// already in its context). excludeNodeID<=0 → no exclusion (searches all nodes).
+// ActivityTraceSearchExcluding keyword-searches every node's
+// steps in this exploration EXCEPT one node's own
+// (excludeNodeID) — so a worker's search_all_worker_traces
+// doesn't return its own in-progress trace (which is already in
+// its context). excludeNodeID<=0 → no exclusion (searches all
+// nodes).
 func (s *ExplorationStore) ActivityTraceSearchExcluding(excludeNodeID int64, q string, limit int) ([]Activity, error) {
 	if excludeNodeID <= 0 {
 		return s.ActivityTraceSearch(nil, q, limit)
@@ -1946,9 +2071,10 @@ AND (summary ILIKE $3 OR detail ILIKE $3) ORDER BY id LIMIT $4`, s.expID, exclud
 	return scanTrace(rows)
 }
 
-// ActivityByIDs loads full detail for specific step ids (the trace drill-down),
-// scoped to this exploration. thinking rows are skipped (never returned, even if
-// their id is asked for). Order is ascending id, not the input order.
+// ActivityByIDs loads full detail for specific step ids (the
+// trace drill-down), scoped to this exploration. thinking rows
+// are skipped (never returned, even if their id is asked for).
+// Order is ascending id, not the input order.
 func (s *ExplorationStore) ActivityByIDs(ids []int64) ([]Activity, error) {
 	if len(ids) == 0 {
 		return nil, nil
@@ -1977,10 +2103,10 @@ FROM activity WHERE exploration_id=$1 AND kind<>'thinking' AND id IN (`+strings.
 	return out, rows.Err()
 }
 
-// ActivityByIDsForTerminalIntents is the inherited-detail read boundary. It
-// deliberately excludes node-less planner/main rows, non-intent activities, live
-// source work, and thinking. Local callers that need legacy behavior use
-// ActivityByIDs instead.
+// ActivityByIDsForTerminalIntents is the inherited-detail read
+// boundary. It deliberately excludes node-less planner/main rows,
+// non-intent activities, live source work, and thinking. Local
+// callers that need legacy behavior use ActivityByIDs instead.
 func (s *ExplorationStore) ActivityByIDsForTerminalIntents(ids []int64) ([]Activity, error) {
 	if len(ids) == 0 {
 		return nil, nil
@@ -2013,9 +2139,10 @@ func (s *ExplorationStore) ActivityByIDsForTerminalIntents(ids []int64) ([]Activ
 	return out, rows.Err()
 }
 
-// AddStandaloneFinding writes a finding to the standalone findings table, which
-// persists across task deletion (task_id / node_id become NULL when the task or
-// exploration node is deleted). taskID and nodeID may be 0 (stored as NULL).
+// AddStandaloneFinding writes a finding to the standalone findings
+// table, which persists across task deletion (task_id / node_id
+// become NULL when the task or exploration node is deleted).
+// taskID and nodeID may be 0 (stored as NULL).
 func (s *ExplorationStore) AddStandaloneFinding(taskID, nodeID int64, vulnclass, name, severity, summary, evidence, worker string, assetIDs []int64) (int64, error) {
 	return s.db.AddFinding(taskID, nodeID, vulnclass, name, severity, summary, evidence, worker, assetIDs)
 }
