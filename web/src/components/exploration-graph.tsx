@@ -440,7 +440,7 @@ function NodeDetailSheet({
                       <span className="font-mono text-xs">#{node.source_task_id} (inherited, read-only)</span>
                     </DetailRow>
                   )}
-                  <DetailRow label="Time">{new Date(node.ts).toLocaleString("zh-CN")}</DetailRow>
+                  <DetailRow label="Time">{new Date(node.ts).toLocaleString("en-US")}</DetailRow>
                 </section>
 
                 {node.type === "digest" && (

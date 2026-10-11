@@ -247,3 +247,17 @@ naming consistent across UI, backend, prompts, and docs.
    flowery marketing language. Match the style of `not-found.tsx`
    ("Page not found. Go back home.") and the Go doc-comments already
    in English.
+
+## Intentional CJK preserves
+
+Some Chinese strings remain in the codebase after translation. They are
+deliberate — see the table below. Cross-checkers and follow-up passes
+must NOT translate them.
+
+| Location | Why CJK is preserved |
+|---|---|
+| `sidequestion/validation-2026-09-10.json`, `sidequestion/VALIDATION.md` | Frozen historical validation record from before the i18n pass; not user-facing prose. |
+| `CHANGELOG.md` | Append-only history; retroactively translating would falsify the record. |
+| `db/task_assets_test.go`, `db/company_scope*.go`, `server/skill_upload_test.go`, `agent/blackboard_inheritance_test.go`, `agent/tools_overview_test.go`, `intercept/trace_test.go`, `notify/render_test.go` | CJK is test fixture data for ICP / skill-name / asset-type validators that must accept Unicode. |
+| `server/chat_mentions.go` (`域名`, `子域名`) | Regex keys preserved for backwards compatibility with existing chat messages that contain those tokens; the lookup map has been translated. |
+| `skills/api-recon/` (`reference.md`, `preload.js`, `runtime_harvest.js`) | Skill content follows Chinese pentest conventions; not product UI. |
