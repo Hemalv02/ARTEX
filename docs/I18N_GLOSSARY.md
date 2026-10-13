@@ -257,7 +257,8 @@ must NOT translate them.
 | Location | Why CJK is preserved |
 |---|---|
 | `sidequestion/validation-2026-09-10.json`, `sidequestion/VALIDATION.md` | Frozen historical validation record from before the i18n pass; not user-facing prose. |
-| `CHANGELOG.md` | Append-only history; retroactively translating would falsify the record. |
+| `CHANGELOG.md` | Append-only history; retroactively translating would falsify the record. (Includes quoted Chinese file/path examples like `参考/说明.md` and `中文技能` that document specific bugs — the quoted filename IS the evidence.) |
 | `db/task_assets_test.go`, `db/company_scope*.go`, `server/skill_upload_test.go`, `agent/blackboard_inheritance_test.go`, `agent/tools_overview_test.go`, `intercept/trace_test.go`, `notify/render_test.go` | CJK is test fixture data for ICP / skill-name / asset-type validators that must accept Unicode. |
-| `server/chat_mentions.go` (`域名`, `子域名`) | Regex keys preserved for backwards compatibility with existing chat messages that contain those tokens; the lookup map has been translated. |
-| `skills/api-recon/` (`reference.md`, `preload.js`, `runtime_harvest.js`) | Skill content follows Chinese pentest conventions; not product UI. |
+| `server/chat_mentions.go` | The mention token pattern uses English labels (Finding, Asset, Company, Endpoint, IP, Application, Domain, Subdomain, Service) to match the frontend's `mentionToken()` output — the previous Chinese keys were a regex/backend mismatch. |
+| `skills/api-recon/scripts/preload.js` (`NEGATIVE_RE`), `skills/api-recon/reference.md` (grep regex) | Runtime detection patterns for Chinese-language API responses (`未登录`, `未授权`, `请重新登录`, `登录已过期`, `登录失效`, `授权`). Must stay Chinese to match what Chinese-target APIs return. |
+| `skills/api-recon/` (other files) | Skill scripts and reference docs have been translated; only the runtime detection patterns above preserve CJK. |

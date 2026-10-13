@@ -374,7 +374,7 @@ function JudgeCard() {
                       <SelectItem value={FOLLOW_ACTIVE}>Follow active profile</SelectItem>
                       {profiles.map((p) => (
                         <SelectItem key={p.id} value={p.id}>
-                          {p.name}（{p.model}）
+                          {p.name} ({p.model})
                         </SelectItem>
                       ))}
                     </SelectContent>

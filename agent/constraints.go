@@ -35,7 +35,7 @@ func constraintBlock(ts *db.ExplorationStore) string {
 		return ""
 	}
 	var b strings.Builder
-	b.WriteString("\n\n【Operation constraints (highest priority; override all exploration/expansion heuristics below; self-check before generating any intent or executing any action — if it would violate, do not proceed)】:")
+	b.WriteString("\n\n**Operation constraints (highest priority; override all exploration/expansion heuristics below; self-check before generating any intent or executing any action — if it would violate, do not proceed)**:")
 	if len(allow) > 0 {
 		b.WriteString("\nAllowed operations:\n")
 		b.WriteString(strings.Join(allow, "\n"))

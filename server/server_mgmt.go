@@ -930,7 +930,7 @@ func (s *Server) pgRefreshMCP(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 45*time.Second)
 	defer cancel()
 	if err := s.discoverAndCacheMCP(ctx, target); err != nil {
-		writeErr(w, 502, "toolfindingfailed："+err.Error())
+		writeErr(w, 502, "tool finding failed: "+err.Error())
 		return
 	}
 	tools, _ := pg.MCPToolsDetailed(id)
@@ -1338,7 +1338,7 @@ func (s *Server) fsUploadSkill(w http.ResponseWriter, r *http.Request) {
 	// derive + validate the skill name from the SKILL.md frontmatter.
 	md, err := readZipEntry(skillMD.f)
 	if err != nil {
-		writeErr(w, 400, "read SKILL.md failed："+err.Error())
+		writeErr(w, 400, "read SKILL.md failed: "+err.Error())
 		return
 	}
 	name := skillNameFromFrontmatter(md)
@@ -1358,7 +1358,7 @@ func (s *Server) fsUploadSkill(w http.ResponseWriter, r *http.Request) {
 	skillPath := filepath.Join(s.skillDir, name)
 	overwrite := r.URL.Query().Get("overwrite") == "true"
 	if _, err := os.Stat(skillPath); err == nil && !overwrite {
-		writeErr(w, 409, "skill already exists："+name+"(confirm before retrying if you want to overwrite)")
+		writeErr(w, 409, "skill already exists: "+name+" (confirm before retrying if you want to overwrite)")
 		return
 	}
 

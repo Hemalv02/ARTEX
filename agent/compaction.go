@@ -466,7 +466,7 @@ func buildCompressionInput(g *coldGraph, b block, nodeByID map[int64]*db.Node) s
 		memberSet[m] = true
 	}
 	var sb strings.Builder
-	sb.WriteString("【Member nodes (to be compressed)】:\n")
+	sb.WriteString("**Member nodes (to be compressed)**:\n")
 	for _, m := range b.Members {
 		n := nodeByID[m]
 		kind := "fact"
@@ -494,13 +494,13 @@ func buildCompressionInput(g *coldGraph, b block, nodeByID map[int64]*db.Node) s
 		}
 	}
 	if len(edgeLines) > 0 {
-		sb.WriteString("\n【Blood-line edges among members (parent→child)】:\n")
+		sb.WriteString("\n**Blood-line edges among members (parent→child)**:\n")
 		sort.Strings(edgeLines)
 		sb.WriteString(strings.Join(edgeLines, "\n"))
 		sb.WriteByte('\n')
 	}
 	if len(b.Anchors) > 0 {
-		sb.WriteString("\n【Shared parent / context anchor (NOT members; provided only to understand which intent these results came from)】:\n")
+		sb.WriteString("\n**Shared parent / context anchor (NOT members; provided only to understand which intent these results came from)**:\n")
 		for _, a := range b.Anchors {
 			n := nodeByID[a]
 			state := ""
@@ -534,7 +534,7 @@ func (c *Compactor) compress(ctx context.Context, g *coldGraph, b block, nodeByI
 }
 
 // compressionSystemPrompt is the §4 body prompt.
-const compressionSystemPrompt = `You are compressing a set of 【interconnected】 exploration nodes into a synthesized conclusion (body), so the planner can quickly understand "what has been explored in this region."
+const compressionSystemPrompt = `You are compressing a set of **interconnected** exploration nodes into a synthesized conclusion (body), so the planner can quickly understand "what has been explored in this region."
 
 The input is a connected sub-graph:
 - Nodes: each is a summary (one sentence) of an intent or fact, with id, type (intent/fact), state, and confidence (if any).

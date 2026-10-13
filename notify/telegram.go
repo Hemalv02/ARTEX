@@ -147,13 +147,13 @@ func telegramHTML(m Message) (string, int) {
 			telegramEscape(StatusLabel(it.FromStatus)), telegramEscape(StatusLabel(it.ToStatus))))
 	}
 	if it.VulnClass != "" && it.VulnClass != it.Title() {
-		b.WriteString("\n<b>Type</b>：" + telegramEscape(it.VulnClass))
+		b.WriteString("\n<b>Type</b>: " + telegramEscape(it.VulnClass))
 	}
 	if a := assetLine(it.Assets, maxAssetsShown); a != "" {
-		b.WriteString("\n<b>Asset</b>：" + telegramEscape(a))
+		b.WriteString("\n<b>Asset</b>: " + telegramEscape(a))
 	}
 	if s := OneLine(it.Summary, maxSummaryRunes); s != "" {
-		b.WriteString("\n<b>Summary</b>：" + telegramEscape(s))
+		b.WriteString("\n<b>Summary</b>: " + telegramEscape(s))
 	}
 	if it.DetailURL != "" {
 		b.WriteString(fmt.Sprintf("\n\n<a href=\"%s\">View details</a>", telegramEscapeAttr(it.DetailURL)))

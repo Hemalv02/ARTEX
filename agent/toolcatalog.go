@@ -38,7 +38,7 @@ type ToolSeed struct {
 // safe — these tools are only used here to read Name()/Description()/
 // InputSchema() and are never Call()ed here.
 //
-// Deliberately 【excludes】 the SDK general tools actool.DefaultTools() (Read/
+// Deliberately **excludes** the SDK general tools actool.DefaultTools() (Read/
 // Write/Edit/MultiEdit/LS/Glob/Grep/Bash): they are fixed per agent, with no
 // "who to bind to" tradeoff, and most of their description lives in Prompt()
 // (this catalog only covers Description(), which would cause a half-overridden
@@ -69,8 +69,8 @@ func builtinToolsByAgent() map[string][]actool.CoreTool {
 }
 
 // defaultUnbound: these system tools are still listed in the catalog (visible
-// in the web UI, manually togglable per agent), but 【are not bound to any
-// agent by default】 — ToolResolve drops tools with empty bindings for every
+// in the web UI, manually togglable per agent), but **are not bound to any
+// agent by default** — ToolResolve drops tools with empty bindings for every
 // agent, so they must be explicitly opted in. The reason they still live in
 // some agent's base tool set (e.g. goal_met in PlannerTools): (1) so the seed
 // can construct them to read desc/schema, and (2) so a user who manually

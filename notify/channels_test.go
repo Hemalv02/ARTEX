@@ -259,7 +259,7 @@ func TestWebhookDefaultTemplateProducesValidJSON(t *testing.T) {
 	// contains quotes and newlines, any plain `"title": "{{.Title}}"`
 	// would produce invalid JSON. {{json .}} does not.
 	srv := capturePost(t, `{"ok":true}`, func(t *testing.T, body map[string]any, _ *http.Request) {
-		if body["title"] != `[High] Login "SQL injection" risk` {
+		if body["title"] != `[🟠 High] Login "SQL injection" risk` {
 			t.Errorf("title is not rendered correctly: %v", body["title"])
 		}
 		items, _ := body["items"].([]any)

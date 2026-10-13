@@ -48,7 +48,7 @@ var wrapupTurnDefaults = map[string]int{
 
 const genericWrapupTurns = 10
 
-const plannerWrapUpDefault = "Your planned-step budget for this round is nearly exhausted — note that this only means 【this round】 is ending; the system will continue to wake you for further planning as the situation evolves. It is NOT a task termination, and you do not need to wrap up the whole plan here. Land the conclusions you've already reached this round — don't let the round go to waste — but 【do not force intents just to wrap up】 (0 intents this round is still a perfectly normal outcome): (1) if you have already identified an exploration direction that 【should be dispatched right now】, batch-submit it with a single add_intent (don't sit on what you've already decided); (2) for any goal that is already proven by a finding/fact, call prove_goal to mark it met (don't miss it); (3) if you recognize a serial exploit chain that needs to be split into steps, write it down with TodoWrite so the next wake-up can continue dispatching. When done, just end this round; no summary text is needed."
+const plannerWrapUpDefault = "Your planned-step budget for this round is nearly exhausted — note that this only means **this round** is ending; the system will continue to wake you for further planning as the situation evolves. It is NOT a task termination, and you do not need to wrap up the whole plan here. Land the conclusions you've already reached this round — don't let the round go to waste — but **do not force intents just to wrap up** (0 intents this round is still a perfectly normal outcome): (1) if you have already identified an exploration direction that **should be dispatched right now**, batch-submit it with a single add_intent (don't sit on what you've already decided); (2) for any goal that is already proven by a finding/fact, call prove_goal to mark it met (don't miss it); (3) if you recognize a serial exploit chain that needs to be split into steps, write it down with TodoWrite so the next wake-up can continue dispatching. When done, just end this round; no summary text is needed."
 
 const mainAgentWrapUpDefault = "Your step budget is nearly exhausted and this interaction is about to end. Do not start any new exploration or operations. Please **summarize the current progress, key conclusions, and suggested next steps in a single plain-text sentence** to the user."
 
@@ -108,7 +108,7 @@ func wrapupSettlement(agentKey string, disabledTools []string) *harness.Settleme
 
 // ---------- Task-level timeout wrap-up prompt (see docs/task-level-timeout-and-wrapup-design.md) ----------
 //
-// This is a 【different pair】 from the per-run wrap-up prompt: per-run says "your
+// This is a **different pair** from the per-run wrap-up prompt: per-run says "your
 // budget for THIS run is up"; task-timeout says "the whole task has reached its
 // deadline, time to end". The semantics often run in opposite directions (especially
 // for the planner: per-run says "don't stop, keep planning", while task-timeout says
@@ -128,9 +128,9 @@ var taskTimeoutWrapupDefaults = map[string]string{
 	"planner": plannerTaskTimeoutDefault,
 }
 
-const workerTaskTimeoutDefault = "**The whole task has reached its timeout limit and is about to end** (not your per-run budget — the entire exploration is done). This is the last chance to: (1) write back 【everything】 you have already identified but not yet persisted — new assets via insert_assets, exploration conclusions/facts via record_fact, and confirmed findings via report_finding; (2) do NOT start any new commands or probes; (3) **finally, summarize the key conclusions for this intent in a single plain-text sentence**."
+const workerTaskTimeoutDefault = "**The whole task has reached its timeout limit and is about to end** (not your per-run budget — the entire exploration is done). This is the last chance to: (1) write back **everything** you have already identified but not yet persisted — new assets via insert_assets, exploration conclusions/facts via record_fact, and confirmed findings via report_finding; (2) do NOT start any new commands or probes; (3) **finally, summarize the key conclusions for this intent in a single plain-text sentence**."
 
-const plannerTaskTimeoutDefault = "**The whole task has reached its timeout limit and is about to end** (not this round — the whole task is terminating). Based on the current 【all】 facts and findings, make a final goal judgment: for any goal that is already proven by evidence, call prove_goal to mark it met (don't miss any). **Do NOT generate any new intents** (intents dispatched now will not be executed). Once judgment is complete, wrap up; no summary text is needed."
+const plannerTaskTimeoutDefault = "**The whole task has reached its timeout limit and is about to end** (not this round — the whole task is terminating). Based on the current **all** facts and findings, make a final goal judgment: for any goal that is already proven by evidence, call prove_goal to mark it met (don't miss any). **Do NOT generate any new intents** (intents dispatched now will not be executed). Once judgment is complete, wrap up; no summary text is needed."
 
 // TaskTimeoutWrapupDefault returns the built-in task-timeout default wrap-up
 // prompt for the given agent (used by the admin UI as the placeholder / restore
@@ -169,7 +169,7 @@ func resolveTaskTimeoutTurns(agentKey string) int {
 //   - clamped=false → task is still early: both reasons use the per-run prompt
 //     (i.e. degraded to wrapupSettlement).
 //
-// Harness.PromptByReason picks the prompt at wind-up time based on the 【actual】
+// Harness.PromptByReason picks the prompt at wind-up time based on the **actual**
 // reason, avoiding the build-time mismatch.
 func wrapupSettlementForTask(agentKey string, disabledTools []string, clamped bool) *harness.Settlement {
 	perRun := resolveWrapup(agentKey)

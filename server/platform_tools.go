@@ -195,7 +195,7 @@ func toDBTool(a customToolToolInput) *db.Tool {
 }
 
 func (s *Server) toolCreateCustomTool() actool.CoreTool {
-	return wrTool("create_custom_tool", "【important】When installing a tool that the platform does not have, call this tool to put the installed tool into the platform so it can be called! Create a custom tool (shell/command/script/http). shell=bash environment declaration, only needs key+description+agents, no exec/schema needed.",
+	return wrTool("create_custom_tool", "**important**When installing a tool that the platform does not have, call this tool to put the installed tool into the platform so it can be called! Create a custom tool (shell/command/script/http). shell=bash environment declaration, only needs key+description+agents, no exec/schema needed.",
 		customToolSchema("tool key (lowercase letter start, letters/digits/underscores)"),
 		func(_ context.Context, in json.RawMessage) (actool.Result, error) {
 			var a customToolToolInput

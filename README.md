@@ -387,24 +387,24 @@ flowchart TB
     UI["Dashboard · Tasks · Assets · Coverage graph · Traffic · Workspace · Settings"]
   end
   subgraph SRV["server (Go net/http)"]
-    API["REST /api/*　JWT auth　SSE"]
+    API["REST /api/* JWT auth SSE"]
     ENG["engine scheduling loop"]
-    MGR["Manager　task/engine/store lifecycle"]
+    MGR["Manager task/engine/store lifecycle"]
   end
   subgraph AG["agent (norma SDK)"]
-    GO["goals　goal decomposition + scope extraction"]
-    PL["planner　planner (sole intent generator)"]
-    WK["worker　executor ×N"]
-    MA["mainagent　human-in-the-loop"]
+    GO["goals goal decomposition + scope extraction"]
+    PL["planner planner (sole intent generator)"]
+    WK["worker executor ×N"]
+    MA["mainagent human-in-the-loop"]
   end
   subgraph DB["PostgreSQL"]
-    AGRAPH["Asset graph　assets / companies / task_scope"]
-    EGRAPH["Exploration graph　exploration_nodes / anchors / activity"]
+    AGRAPH["Asset graph assets / companies / task_scope"]
+    EGRAPH["Exploration graph exploration_nodes / anchors / activity"]
   end
   subgraph SUB["Supporting subsystems"]
-    PROXY["Traffic recording proxy　MITM + CA logging"]
-    GUARD["guard / intercept　tool approval gate"]
-    ENR["enrich　DNS / HTTP async enrichment"]
+    PROXY["Traffic recording proxy MITM + CA logging"]
+    GUARD["guard / intercept tool approval gate"]
+    ENR["enrich DNS / HTTP async enrichment"]
     EXT["MCP · skills · memory · report"]
   end
 
@@ -563,15 +563,15 @@ cross-wake shared planning todolist**:
 flowchart TB
   subgraph TODO["Shared todolist (per-task retained · cross-wake resident)"]
     direction LR
-    T1["1 Injection point　[Done]"]
-    T2["2 Take credentials　[In progress]"]
-    T3["3 Lateral　[Awaiting prerequisite]"]
-    T4["4 Privilege escalation　[Awaiting prerequisite]"]
+    T1["1 Injection point [Done]"]
+    T2["2 Take credentials [In progress]"]
+    T3["3 Lateral [Awaiting prerequisite]"]
+    T4["4 Privilege escalation [Awaiting prerequisite]"]
     T1 -.prereq satisfied.-> T2 -.-> T3 -.-> T4
   end
-  R1["Wake round 1　dispatch intent ①"] --> T1
-  R2["Round 2 (① produced fact)　dispatch intent ②"] --> T2
-  R3["Round 3 (② produced fact)　dispatch intent ③"] --> T3
+  R1["Wake round 1 dispatch intent ①"] --> T1
+  R2["Round 2 (① produced fact) dispatch intent ②"] --> T2
+  R3["Round 3 (② produced fact) dispatch intent ③"] --> T3
 ```
 
 So the attack chain **progresses stably, without repetition and without misordering** in an

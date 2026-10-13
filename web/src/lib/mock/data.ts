@@ -1297,7 +1297,7 @@ export const frontier: TaskNode[] = explorationGraph.nodes.filter(
 // Each worker session contains a complete tool execution chain (tool_use -> tool_result -> ... -> result).
 export const activity: Activity[] = [
   // planner -- each round's complete decision chain: read situation -> pull worker output for review -> judge goal progress -> add_intent to dispatch direction
-  // -- Round 0 - Goal decomposition and initial intents（2026-07-24 09:12）--
+  // -- Round 0 - Goal decomposition and initial intents(2026-07-24 09:12)--
   { seq: 1000, worker: "planner", ts: T("2026-07-24T09:12:10Z"), kind: "round", summary: "Round 0 · Goal decomposition" },
   {
     seq: 1001,
@@ -1358,7 +1358,7 @@ export const activity: Activity[] = [
       "This round dispatches the first batch of 4 intents: i1 asset recon, i2 backend password, i4 injection, i5 API authorization. g1 is covered by i2, g2 by i4/i5 - both objectives have independent entries in flight. After workers produce facts, we will reinforce based on lineage.",
   },
 
-  // -- Round 1 · Attack-surface reinforcement（2026-07-25 14:12）--
+  // -- Round 1 · Attack-surface reinforcement(2026-07-25 14:12)--
   { seq: 1100, worker: "planner", ts: T("2026-07-25T14:12:00Z"), kind: "round", summary: "Round 1 · Attack-surface reinforcement" },
   {
     seq: 1101,
@@ -1418,7 +1418,7 @@ export const activity: Activity[] = [
       "Situation upgrade: source code + hardcoded internal-network password + Fastjson RCE form an entirely new attack path. Requested the goals layer to register g3 \"Breach the DMZ from the external network and establish an internal foothold\", dispatching i6 (fingerprinting/CVE correlation) and i7 (triggering RCE). The DMZ privesc step depends on shell output - logged as a follow-up to dispatch next round.",
   },
 
-  // -- Round 2 · Foothold established, pivot to internal（2026-07-25 20:25）--
+  // -- Round 2 · Foothold established, pivot to internal(2026-07-25 20:25)--
   {
     seq: 1200,
     worker: "planner",
@@ -1501,7 +1501,7 @@ export const activity: Activity[] = [
       "g3 achieved — the attack surface has shifted from the external network to the internal network. Requested registration of g4 \"Lateral movement — take over the internal target DC01\"; dispatching i9 (host discovery) + i10/i11/i12 in parallel for lateral movement. Credential reuse is anchored directly to faCreds — passwords leaked from the external source feed the internal lateral movement.",
   },
 
-  // -- Round 3 · Target achieved — review（2026-07-26 00:25）--
+  // -- Round 3 · Target achieved — review(2026-07-26 00:25)--
   { seq: 1300, worker: "planner", ts: T("2026-07-26T00:25:00Z"), kind: "round", summary: "Round 3 · Target achieved — review" },
   {
     seq: 1301,
@@ -1559,7 +1559,7 @@ export const activity: Activity[] = [
       "g4 wrapped up - the external-to-internal chain is fully connected (external RCE -> DMZ -> internal -> DC). Reviewing uncovered directions one by one: g2 \"Read user PII data\" is still one step short, but existing i3 (backend user endpoints) + i5 (API IDOR) already cover this direction and both are running. No fundamentally new uncovered directions this round - per the restraint principle, 0 new intents; wait for i3/i5 output.",
   },
 
-  // -- Round 4 · Backend achieved, converge g2（2026-07-26 03:55）--
+  // -- Round 4 · Backend achieved, converge g2(2026-07-26 03:55)--
   {
     seq: 1400,
     worker: "planner",
@@ -1907,7 +1907,7 @@ export const activity: Activity[] = [
     cache_write_tokens: 11000,
   },
 
-  // work#5 · i5 IDOR（running）
+  // work#5 · i5 IDOR(running)
   {
     seq: 50,
     worker: "work#5",
@@ -2523,7 +2523,7 @@ export const activity: Activity[] = [
     cache_write_tokens: 9500,
   },
 
-  // work#12 · i12 Kerberoasting（done）
+  // work#12 · i12 Kerberoasting(done)
   {
     seq: 380,
     worker: "work#12",
