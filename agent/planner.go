@@ -226,7 +226,7 @@ func factIDsYielded(ts *db.ExplorationStore, id int64) string {
 	for i, fid := range ids {
 		parts[i] = fmt.Sprintf("#%d", fid)
 	}
-	return strings.Join(parts, "、")
+	return strings.Join(parts, ", ")
 }
 
 // intentSummary reads an intent node's one-line summary (best-effort, "?" on miss).

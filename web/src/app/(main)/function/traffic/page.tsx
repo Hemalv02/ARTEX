@@ -796,7 +796,7 @@ export default function TrafficPage() {
                 <>
                   This will permanently delete all traffic records for <span className="font-semibold tabular-nums">{selectedHosts.length}</span> target(s) (
                   <span className="font-mono">
-                    {selectedHosts.slice(0, 3).join("、")}
+                    {selectedHosts.slice(0, 3).join(", ")}
                     {selectedHosts.length > 3 ? "…" : ""}
                   </span>
                   ) including the raw request/response. This cannot be undone.

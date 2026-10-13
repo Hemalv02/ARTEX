@@ -307,24 +307,24 @@ flowchart TB
     UI["Dashboard · Tasks · Assets · Coverage map · Traffic · Workspace · System config"]
   end
   subgraph SRV["server (Go net/http)"]
-    API["REST /api/*　JWT auth　SSE"]
+    API["REST /api/* · JWT auth · SSE"]
     ENG["engine scheduling loop"]
-    MGR["Manager　task/engine/store lifecycle"]
+    MGR["Manager · task/engine/store lifecycle"]
   end
   subgraph AG["agent (norma SDK)"]
-    GO["goals　goal decomposition + scope extraction"]
-    PL["planner　the planner (sole intent generator)"]
-    WK["worker　executor ×N"]
-    MA["mainagent　human-in-the-loop"]
+    GO["goals · goal decomposition + scope extraction"]
+    PL["planner · the planner (sole intent generator)"]
+    WK["worker · executor ×N"]
+    MA["mainagent · human-in-the-loop"]
   end
   subgraph DB["PostgreSQL"]
-    AGRAPH["asset graph　assets / companies / task_scope"]
-    EGRAPH["exploration graph　exploration_nodes / anchors / activity"]
+    AGRAPH["asset graph · assets / companies / task_scope"]
+    EGRAPH["exploration graph · exploration_nodes / anchors / activity"]
   end
   subgraph SUB["Supporting subsystems"]
-    PROXY["traffic-recording proxy　MITM + CA audit trail"]
-    GUARD["guard / intercept　tool approval gate"]
-    ENR["enrich　async DNS / HTTP enrichment"]
+    PROXY["traffic-recording proxy · MITM + CA audit trail"]
+    GUARD["guard / intercept · tool approval gate"]
+    ENR["enrich · async DNS / HTTP enrichment"]
     EXT["MCP · skills · memory · report"]
   end
 
@@ -450,15 +450,15 @@ A real attack chain is often a **multi-step sequence with front-to-back dependen
 flowchart TB
   subgraph TODO["Shared todolist (retained per task · persistent across wakes)"]
     direction LR
-    T1["1 Injection point　[done]"]
-    T2["2 Obtain credentials　[in progress]"]
-    T3["3 Lateral movement　[awaiting prereq]"]
-    T4["4 Privilege escalation　[awaiting prereq]"]
+    T1["1 Injection point · [done]"]
+    T2["2 Obtain credentials · [in progress]"]
+    T3["3 Lateral movement · [awaiting prereq]"]
+    T4["4 Privilege escalation · [awaiting prereq]"]
     T1 -.prereq met.-> T2 -.-> T3 -.-> T4
   end
-  R1["Round 1 wake　dispatch intent ①"] --> T1
-  R2["Round 2 (① yields fact)　dispatch intent ②"] --> T2
-  R3["Round 3 (② yields fact)　dispatch intent ③"] --> T3
+  R1["Round 1 wake · dispatch intent ①"] --> T1
+  R2["Round 2 (① yields fact) · dispatch intent ②"] --> T2
+  R3["Round 3 (② yields fact) · dispatch intent ③"] --> T3
 ```
 
 So the attack chain still **advances stably, without duplication and without reordering** in an "event-driven + stateless session" environment — this is the key to ARTEX being able to autonomously walk through a multi-step exploitation chain.

@@ -1131,7 +1131,7 @@ function AgentTriggersTab({ agentKey, agent }: { agentKey: string; agent?: Agent
               </div>
               <div className="text-muted-foreground grid gap-0.5 text-xs">
                 {t.interval_sec > 0 && t.interval_message && <div className="line-clamp-1">Schedule: {t.interval_message}</div>}
-                {t.on_finding && t.finding_message && <div className="line-clamp-1">finding：{t.finding_message}</div>}
+                {t.on_finding && t.finding_message && <div className="line-clamp-1">finding: {t.finding_message}</div>}
                 {t.on_goal_met && t.goal_message && <div className="line-clamp-1">Goal: {t.goal_message}</div>}
                 {t.on_task_timeout && t.task_timeout_message && <div className="line-clamp-1">Timeout: {t.task_timeout_message}</div>}
                 {t.on_task_create && t.task_create_message && <div className="line-clamp-1">Task created: {t.task_create_message}</div>}
