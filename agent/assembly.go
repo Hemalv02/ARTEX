@@ -35,7 +35,7 @@ var ToolAugment func(ctx context.Context, agentKey string) (extra []actool.CoreT
 
 // AugmentTools returns base plus the agent's visible skill/MCP tools, the
 // DeferredInfo, and a cleanup func the caller must defer (closes MCP clients).
-// Built-in base tools are kept as-is — never filtered (内置工具留代码层，不做可见性过滤).
+// Built-in base tools are kept as-is — never filtered (built-in tools live in the code layer and are not subject to visibility filtering).
 func AugmentTools(ctx context.Context, agentKey string, base []actool.CoreTool) ([]actool.CoreTool, DeferredInfo, func()) {
 	var (
 		def     DeferredInfo

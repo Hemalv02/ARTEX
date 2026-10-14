@@ -1,5 +1,5 @@
 // Package enrich is the engine-side (non-AI) asset auto-completion layer described
-// in docs/资产模型与自动关联设计.md §5: an async worker pool that resolves domains
+// in docs/asset-model-and-auto-correlation-design.md §5: an async worker pool that resolves domains
 // (dnsx) and probes web assets (HTTP, through the recording proxy) and writes the
 // results back into the asset graph — creating IP/port nodes, resolves/exposes
 // edges, and filling attrs.dns / attrs.http. DNS is ungated; HTTP probing is gated

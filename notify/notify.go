@@ -1,37 +1,46 @@
-// Package notify 实现漏洞发现的 IM / 邮件推送渠道适配层。
+// Package notify implements the IM / email push channel adapter layer for
+// finding discovery.
 //
-// 分层：本包是**叶子包**，只依赖标准库。它不认识数据库、不认识 server。渠道配置
-// 以 map[string]any 传入（对应 notification_channels.config 这一 JSONB 列），
-// 待推送内容以 Message 传入。这样拆开的好处是：签名计算、UTF-8 截断、过滤匹配这些
-// 真正容易出错的地方可以脱离 PostgreSQL 单测，宿主只需在 server 侧做编排。
+// Layering: this is a **leaf package** that depends only on the standard
+// library. It knows nothing about the database or the server. Channel config
+// is passed in as map[string]any (corresponding to the
+// notification_channels.config JSONB column), and the content to push is passed
+// in as a Message. The benefit of splitting it this way is that the genuinely
+// error-prone parts — signature computation, UTF-8 truncation, filter matching
+// — can be unit-tested without PostgreSQL, while the host only has to do the
+// orchestration on the server side.
 //
-// 并发约定：Channel 的实现必须**无状态**。同一个 Channel 实例会被多个渠道配置
-// （甚至同一渠道的多个机器人实例）并发复用，所有凭据一律从 cfg 参数传入，
-// 不允许把 webhook URL 之类的东西缓存进实现自身的字段。
+// Concurrency contract: Channel implementations must be **stateless**. A single
+// Channel instance is reused concurrently by multiple channel configs (even
+// multiple bot instances of the same channel); all credentials are always
+// passed in via the cfg argument, and caching something like a webhook URL in
+// the implementation's own fields is not allowed.
 package notify
 
-// 渠道类型标识。取值同时是 notification_channels.kind 的合法集合，由 server 侧
-// 白名单校验（与 findings.status 同理，不用 DB CHECK，方便后续加渠道）。
+// Channel type identifiers. The values are also the valid set for
+// notification_channels.kind, validated by an allowlist on the server side
+// (same as findings.status: no DB CHECK, so adding channels later is easy).
 const (
-	KindDingTalk = "dingtalk" // 钉钉自定义机器人
-	KindFeishu   = "feishu"   // 飞书(含 Lark)自定义机器人
-	KindWeCom    = "wecom"    // 企业微信群机器人
-	KindWebhook  = "webhook"  // 通用 Webhook：自定义方法/头/JSON 模板
+	KindDingTalk = "dingtalk" // DingTalk custom bot
+	KindFeishu   = "feishu"   // Feishu (incl. Lark) custom bot
+	KindWeCom    = "wecom"    // WeCom group bot
+	KindWebhook  = "webhook"  // Generic webhook: custom method/headers/JSON template
 	KindTelegram = "telegram" // Telegram Bot API
-	KindEmail    = "email"    // SMTP 邮件
+	KindEmail    = "email"    // SMTP email
 )
 
-// 事件类型，对应 notification_events.kind。
+// Event types, corresponding to notification_events.kind.
 const (
 	EventFindingCreated       = "finding_created"
 	EventFindingStatusChanged = "finding_status_changed"
 )
 
-// InitKind 是 config 里为空的 kind 的兜底值。
+// InitKind is the fallback value for an empty kind in config.
 const InitKind = KindDingTalk
 
-// severityRank 把漏洞级别映射成可比较的序数。未知级别返回 0，因此任何
-// min_severity 设置都会把未知级别挡在外面——存疑时不推，避免误报刷屏。
+// severityRank maps a finding severity to a comparable ordinal. An unknown
+// severity returns 0, so any min_severity setting keeps unknown severities out
+// — when in doubt, don't push, to avoid flooding with false positives.
 var severityRank = map[string]int{
 	"low":      1,
 	"medium":   2,
@@ -39,11 +48,12 @@ var severityRank = map[string]int{
 	"critical": 4,
 }
 
-// SeverityRank 返回级别的序数；未知级别返回 0。
+// SeverityRank returns the ordinal of a severity; an unknown severity returns 0.
 func SeverityRank(severity string) int { return severityRank[severity] }
 
-// SeverityLabel 返回带 emoji 的中文级别名，用于消息标题与卡片配色。
-// 未知级别原样回显，不臆造。
+// SeverityLabel returns the severity name with an emoji, used for message
+// titles and card colors. An unknown severity is echoed back as-is, not
+// invented.
 func SeverityLabel(severity string) string {
 	switch severity {
 	case "critical":
@@ -59,7 +69,8 @@ func SeverityLabel(severity string) string {
 	}
 }
 
-// StatusLabel 把处置状态翻译成中文，用于状态变更消息。
+// StatusLabel returns a human-readable label for a disposition status, used in
+// status-change messages.
 func StatusLabel(status string) string {
 	switch status {
 	case "pending":
@@ -85,8 +96,9 @@ func StatusLabel(status string) string {
 	}
 }
 
-// AtLeast 判断 severity 是否达到 min 门槛。min 为空表示不设门槛，一律通过。
-// 注意未知 severity 的序数为 0，会被任何非空 min 拒掉（见 severityRank 注释）。
+// AtLeast reports whether severity meets the min threshold. An empty min means
+// no threshold, so everything passes. Note that an unknown severity has ordinal
+// 0 and is rejected by any non-empty min (see the severityRank comment).
 func AtLeast(severity, min string) bool {
 	if min == "" {
 		return true

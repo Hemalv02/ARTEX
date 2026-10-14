@@ -214,7 +214,7 @@ func renderTriggers(ts *db.ExplorationStore, evs []TriggerEvent) string {
 	return b.String()
 }
 
-// factIDsYielded lists the fact ids an intent produced this run as "#12、#15", so the
+// factIDsYielded lists the fact ids an intent produced this run as "#12, #15", so the
 // planner can jump straight to the round's incremental facts. Empty (best-effort) when
 // the intent yielded no facts or the lookup fails.
 func factIDsYielded(ts *db.ExplorationStore, id int64) string {

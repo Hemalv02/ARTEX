@@ -37,7 +37,7 @@ var (
 		"On startup the backend restored the task's paused state from the state persisted in the database. This run was cancelled; normally no Agent is running during the recovery phase")
 	AbortGoalMet = cause("goal_met", "Planner determined the task goal was met",
 		"The planner determined the task goal was met and set the task to done, then cancelled the Workers still running; those intents are marked stopped rather than failed")
-	AbortSettleDrainTimeout = cause("settle_drain_timeout", "Wait for the task's timeout wind-down was exhausted",
+	AbortSettleDrainTimeout = cause("settle_drain_timeout", "Timeout wind-down drain exhausted",
 		"After the task reached its timeout it waited for the running Workers to wind down gracefully, but the 90-second drain grace period still was not enough, so a hard cancel was issued; intents are marked exhausted, and facts and assets already written during the wind-down are kept")
 
 	// Per-work context.
@@ -47,7 +47,7 @@ var (
 		"The user paused a running Worker. This call was cancelled and the intent moved to paused; all intents, facts, findings, and activity records already registered are kept, and the intent is re-executed from the start once resumed")
 	AbortWorkCancelledByUser = cause("work_cancelled_by_user", "User deleted this Worker intent",
 		"The user deleted a running Worker. This call was cancelled; after the Worker exits the write region, the server handles the intent according to the deletion mode the user chose — a soft delete only marks it as deleted and keeps all its output, while a hard delete cascades to remove the intent and the downstream nodes supported by it alone")
-	AbortWorkFinished = cause("work_finished", "Worker finished normally and released its context",
+	AbortWorkFinished = cause("work_finished", "Worker finished; context released",
 		"The Worker finished normally and the engine released its context resources in detachWork. This is not a run interruption; if it appears in an interruption message, it means the cancel and the teardown events raced")
 	AbortPausedRaceGuard = cause("paused_race_guard", "New run refused while the task is paused",
 		"While the task is paused the engine refuses to issue a new execution context, guarding against a race between claim and pause that would let a Worker keep starting; a claimed intent returns to the frontier")
@@ -55,9 +55,9 @@ var (
 	// Main Agent and standalone conversation contexts.
 	AbortChatStoppedByUser = cause("chat_stopped_by_user", "User stopped this conversation turn",
 		"The user clicked stop, actively aborting this turn's main Agent or conversation Agent run. Activity records already produced are kept, and the next message can still be sent")
-	AbortChatPausedWithTask = cause("chat_paused_with_task", "Task paused, aborting the main Agent conversation",
+	AbortChatPausedWithTask = cause("chat_paused_with_task", "Task paused; main conversation aborted",
 		"When the user paused the task, the running main Agent conversation was cancelled along with it. Activity records already produced are kept; this turn's message is not replayed automatically once the task resumes")
-	AbortChatTurnFinished = cause("chat_turn_finished", "Conversation turn finished normally and released its context",
+	AbortChatTurnFinished = cause("chat_turn_finished", "Conversation turn finished normally",
 		"This conversation turn finished normally and the server is releasing the turn's context resources. This is not a run interruption; if it appears in an interruption message, it means the cancel and the teardown events raced")
 
 	// Process-level and per-run hard backstop.
